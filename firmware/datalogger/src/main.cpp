@@ -112,7 +112,7 @@ void setup()
 
   if (ascii_mode) {
     // write a header so this can be used as CSV file
-    Serial.write("ax,ay,az,gx,gy,gz");
+    Serial.write("ax,ay,az,gx,gy,gz\n");
   }
 
   // wait a bit for everything to settle
