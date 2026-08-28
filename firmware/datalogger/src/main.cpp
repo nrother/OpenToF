@@ -128,6 +128,17 @@ void setup()
 
 void loop()
 {
+  // check for reset command
+  if (Serial.available()) {
+    char c = Serial.read();
+    if (c == 'r') {
+      digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+      delay(100);
+      myIMU.fifoClear();
+      digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+    }
+  }
+
   int16_t status = myIMU.fifoGetStatus();
   uint16_t words = status & 0x0FFF;
 
