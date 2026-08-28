@@ -7,30 +7,30 @@
 LSM6DS3 myIMU(I2C_MODE, 0x6A);
 
 // Maximum gyro rate is 1.66kHz, Accel would go up to 6.66kHz
-constexpr uint16_t SENSOR_ODR_HZ = 1660;
+constexpr uint16_t SENSOR_ODR_HZ = 416;//208;//833;
 // FIFO rate should be the same, don't know why this is listed as 1600
-constexpr uint16_t FIFO_ODR_HZ = 1600;
+constexpr uint16_t FIFO_ODR_HZ = 400;
 
 // if true, print in ASCII
-constexpr bool ascii_mode = true;
+constexpr bool ascii_mode = false;
 
 // Binary packet:
-//   int16_t accel X
-//   int16_t accel Y
-//   int16_t accel Z
 //   int16_t gyro X
 //   int16_t gyro Y
 //   int16_t gyro Z
+//   int16_t accel X
+//   int16_t accel Y
+//   int16_t accel Z
 //
 // = 12 bytes/sample.
 struct __attribute__((packed)) ImuSample
 {
-  int16_t ax;
-  int16_t ay;
-  int16_t az;
   int16_t gx;
   int16_t gy;
   int16_t gz;
+  int16_t ax;
+  int16_t ay;
+  int16_t az;
 };
 
 static_assert(sizeof(ImuSample) == 12, "Unexpected packet size");
@@ -63,12 +63,8 @@ void setup()
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
 
   // we need a pretty high baud rate
-  if (!ascii_mode) {
-    Serial.begin(460800);
-  } else {
-    Serial.begin(921600);
-  }
-
+  Serial.begin(921600);
+  
   while (!Serial);
 
   // turn on IMU power
@@ -115,10 +111,15 @@ void setup()
     Serial.write("ax,ay,az,gx,gy,gz\n");
   }
 
+  myIMU.fifoBegin();
+
+  // workarround
+  myIMU.writeRegister(LSM6DS3_ACC_GYRO_FIFO_CTRL4, 0); // disable dataset 3 and 4
+
   // wait a bit for everything to settle
   delay(10);
 
-  //clear the FIFO, we are ready to go
+  // clear the FIFO, we are ready to go
   myIMU.fifoClear();
 
   // turn on LED for synchronisation with a camera
@@ -127,42 +128,23 @@ void setup()
 
 void loop()
 {
-  uint16_t fifoStatus = myIMU.fifoGetStatus();
-  // low 12 bits are FIFO sample count
-  uint16_t fifoSamples = fifoStatus & 0x0FFF;
+  int16_t status = myIMU.fifoGetStatus();
+  uint16_t words = status & 0x0FFF;
 
-  // Each FIFO sample contains six 16-bit values:
-  // GX,GY,GZ, AX,AY,AZ
-  while (fifoSamples > 0)
+  while (words >= 6)
   {
+
+    // One complete gyro + accel sample
     ImuSample sample;
 
-    // fifoRead() reads one 16-bit word from FIFO_DATA_OUT.
-    //
-    // The FIFO data order for this configuration is gyro followed
-    // by accelerometer.
-    int16_t gx = myIMU.fifoRead();
-    int16_t gy = myIMU.fifoRead();
-    int16_t gz = myIMU.fifoRead();
-
-    int16_t ax = myIMU.fifoRead();
-    int16_t ay = myIMU.fifoRead();
-    int16_t az = myIMU.fifoRead();
-
-    sample.ax = ax;
-    sample.ay = ay;
-    sample.az = az;
-
-    sample.gx = gx;
-    sample.gy = gy;
-    sample.gz = gz;
+    myIMU.readRegisterRegion(reinterpret_cast<uint8_t *>(&sample), LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(sample));
 
     if (!ascii_mode) {
-      sendSample(sample);
+        sendSample(sample);
     } else {
-      sendSampleAscii(sample);
+        sendSampleAscii(sample);
     }
 
-    fifoSamples--;
+    words -= 6;
   }
 }
