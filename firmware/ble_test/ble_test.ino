@@ -4,7 +4,12 @@
 #define RF_SW_PW_PIN PB5
 #define RF_SW_PIN PB4
 
-bool notification_enabled = false;
+bool tof_notification_enabled = false;
+bool battery_notification_enabled = false;
+
+extern uint16_t tof_characteristic_handle, battery_characteristic_handle;
+extern uint16_t last_tof;
+extern uint8_t battery_level;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -15,29 +20,61 @@ void setup() {
   // configure the antenna
   pinMode(PB5, OUTPUT);
   pinMode(PB4, OUTPUT);
-  digitalWrite(PB4, LOW); // build-in antenna
-  digitalWrite(PB5, HIGH); // power on rf-switch
+  digitalWrite(PB4, LOW);   // build-in antenna
+  digitalWrite(PB5, HIGH);  // power on rf-switch
+
+  // connect battery voltage to ADC
+  pinMode(PD3, OUTPUT);
+  digitalWrite(PD3, HIGH);
 
   delay(100);
 }
 
 void loop() {
-  if (notification_enabled) {
-    // Send a notification every two seconds with the message 'hello world'
-    send_tof_notification();
+  sl_status_t sc;
+  if (tof_notification_enabled) {
+    sc = sl_bt_gatt_server_write_attribute_value(tof_characteristic_handle, 0, sizeof(last_tof), (const uint8_t *)&last_tof);
+    app_assert_status(sc);
+    sc = sl_bt_gatt_server_notify_all(tof_characteristic_handle, sizeof(last_tof), (const uint8_t *)&last_tof);
+    last_tof++;  // DEBUG, just increase ToF
+    if (sc == SL_STATUS_OK) {
+      Serial.println("Send ToF notification!");
+    }
   }
+
+  // read battery voltage
+  // TODO: This produces bogus readings if not battery is connected
+  int voltageValue = analogRead(PD4);
+  float voltage = voltageValue * (2 * 3.3 / 4095.0);
+  Serial.print("Battery voltage: ");
+  Serial.print(voltage, 2);
+  Serial.println(" V");
+  // convert to battery level (0-100%)
+  // note: This is a very crude formula, assuming a linear correlation between battery level and voltage
+  // TODO: Find something better. This must be a solved problem.
+  int level = round((voltage - 3.2) / (4.2 - 3.2) * 100);
+  // check if the level changed
+  if (level != battery_level) {
+    battery_level = level;
+    // always update value for manual reading by the client
+    sc = sl_bt_gatt_server_write_attribute_value(battery_characteristic_handle, 0, sizeof(battery_level), (const uint8_t *)&battery_level);
+    app_assert_status(sc);
+    // send notification only if enabled
+    if (battery_notification_enabled) {
+      sc = sl_bt_gatt_server_notify_all(battery_characteristic_handle, sizeof(battery_level), (const uint8_t *)&battery_level);
+      if (sc == SL_STATUS_OK) {
+        Serial.println("Send battery notification!");
+      }
+    }
+  }
+  
   delay(1000);
 }
-
-// void ble_initialize_gatt_db();
-static void ble_start_advertising();
-extern uint16_t tof_characteristic_handle;
-extern uint16_t last_tof;
 
 // callback for the BLE stack
 void sl_bt_on_event(sl_bt_msg_t *evt) {
   switch (SL_BT_MSG_ID(evt->header)) {
-    case sl_bt_evt_system_boot_id: // BLE stack ready
+    case sl_bt_evt_system_boot_id:  // BLE stack ready
       {
         Serial.println("BLE stack booted");
 
@@ -50,47 +87,27 @@ void sl_bt_on_event(sl_bt_msg_t *evt) {
       }
       break;
 
-    case sl_bt_evt_connection_opened_id: // client connected
+    case sl_bt_evt_connection_opened_id:  // client connected
       Serial.println("BLE connection opened");
       break;
 
-    case sl_bt_evt_connection_closed_id: // client disconnected
+    case sl_bt_evt_connection_closed_id:  // client disconnected
       Serial.println("BLE connection closed");
       // Restart the advertisement
       ble_start_advertising();
       Serial.println("BLE advertisement restarted");
       break;
 
-    case sl_bt_evt_gatt_server_characteristic_status_id: // GATT characteristic changed
-      // If the 'ToF' characteristic has been changed
-      // TOOD: Also check for battery characteristic
+    case sl_bt_evt_gatt_server_characteristic_status_id:  // GATT characteristic changed, update notifcations flags
       if (evt->data.evt_gatt_server_characteristic_status.characteristic == tof_characteristic_handle) {
-        // The client just enabled the notification - send notification of the current state
-        if (evt->data.evt_gatt_server_characteristic_status.client_config_flags & sl_bt_gatt_notification) {
-          Serial.println("change notification enabled");
-          notification_enabled = true;
-        } else {
-          Serial.println("change notification disabled");
-          notification_enabled = false;
-        }
+        tof_notification_enabled = evt->data.evt_gatt_server_characteristic_status.client_config_flags & sl_bt_gatt_notification;
+      } else if (evt->data.evt_gatt_server_characteristic_status.characteristic == battery_characteristic_handle) {
+        battery_notification_enabled = evt->data.evt_gatt_server_characteristic_status.client_config_flags & sl_bt_gatt_notification;
       }
       break;
 
-    default: // unhandled event, ignored
+    default:  // unhandled event, ignored
       break;
-  }
-}
-
-/**************************************************************************/ /**
- * Sends a BLE notification the the client if notifications are enabled 
- *****************************************************************************/
-static void send_tof_notification() {
-  sl_status_t sc = sl_bt_gatt_server_write_attribute_value(tof_characteristic_handle, 0, sizeof(last_tof), (const uint8_t *)&last_tof);
-  app_assert_status(sc);
-  sc = sl_bt_gatt_server_notify_all(tof_characteristic_handle, sizeof(last_tof), (const uint8_t *)&last_tof);
-  last_tof++;
-  if (sc == SL_STATUS_OK) {
-    Serial.println("Send notification!");
   }
 }
 
@@ -128,4 +145,3 @@ static void ble_start_advertising() {
   sc = sl_bt_legacy_advertiser_start(advertising_set_handle, sl_bt_advertiser_connectable_scannable);
   app_assert_status(sc);
 }
-

@@ -2,12 +2,12 @@ const char device_name[] = "OpenToF Sensor";
 const char manufacturer_name[] = "OpenToF Developers";
 const char model_name[] = "XIAO MG24 Sense";
 const char firmware_version[] = "v0.1-dev";
-uint8_t battery_level = 50;
+uint8_t battery_level = 0;
 uint16_t last_tof = 0;
 uint16_t gattdb_session_id;
 uint16_t generic_access_service_handle, device_information_service_handle, battery_service_handle;
 uint16_t custom_service_handle;
-uint16_t tof_characteristic_handle;
+uint16_t tof_characteristic_handle, battery_characteristic_handle;
 
 // Initialize the GATT database
 void ble_initialize_gatt_db() {
@@ -80,7 +80,19 @@ void ble_initialize_gatt_db() {
 
   // 0x2A19 Battery Level
   // TODO: This should support notify and we need to update this :)
-  sc = ble_gatt_add_fixed_characteristic_16(0x2A19, gattdb_session_id, battery_service_handle, (const char*)&battery_level, sizeof(battery_level));
+  sl_bt_uuid_16_t battery_characteristic_uuid = { .data = { 0x19, 0x2A } };
+  //sc = ble_gatt_add_fixed_characteristic_16(0x2A19, gattdb_session_id, battery_service_handle, (const char*)&battery_level, sizeof(battery_level));
+  sc = sl_bt_gattdb_add_uuid16_characteristic(gattdb_session_id,
+                                              battery_service_handle,
+                                              SL_BT_GATTDB_CHARACTERISTIC_READ | SL_BT_GATTDB_CHARACTERISTIC_NOTIFY,
+                                              0x00,
+                                              0x00,
+                                              battery_characteristic_uuid,
+                                              sl_bt_gattdb_fixed_length_value,
+                                              sizeof(battery_level),
+                                              sizeof(battery_level),
+                                              (const uint8_t*)&battery_level,
+                                              &battery_characteristic_handle);
   app_assert_status(sc);
 
   // start the Battery service
