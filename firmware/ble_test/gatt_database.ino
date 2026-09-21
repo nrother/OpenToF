@@ -79,7 +79,6 @@ void ble_initialize_gatt_db() {
   app_assert_status(sc);
 
   // 0x2A19 Battery Level
-  // TODO: This should support notify and we need to update this :)
   sl_bt_uuid_16_t battery_characteristic_uuid = { .data = { 0x19, 0x2A } };
   //sc = ble_gatt_add_fixed_characteristic_16(0x2A19, gattdb_session_id, battery_service_handle, (const char*)&battery_level, sizeof(battery_level));
   sc = sl_bt_gattdb_add_uuid16_characteristic(gattdb_session_id,
@@ -91,7 +90,7 @@ void ble_initialize_gatt_db() {
                                               sl_bt_gattdb_fixed_length_value,
                                               sizeof(battery_level),
                                               sizeof(battery_level),
-                                              (const uint8_t*)&battery_level,
+                                              (const uint8_t *)&battery_level,
                                               &battery_characteristic_handle);
   app_assert_status(sc);
 
@@ -103,7 +102,7 @@ void ble_initialize_gatt_db() {
   // UUID: 0b2aaecb-86e4-4453-b875-44f082813961
   // -------------------------------------------------------------------------------------
   const uuid_128 custom_service_uuid = {
-    .data = {0x0b,0x2a,0xae,0xcb,0x86,0xe4,0x44,0x53,0xb8,0x75,0x44,0xf0,0x82,0x81,0x39,0x61}
+    .data = { 0x0b, 0x2a, 0xae, 0xcb, 0x86, 0xe4, 0x44, 0x53, 0xb8, 0x75, 0x44, 0xf0, 0x82, 0x81, 0x39, 0x61 }
   };
   sc = sl_bt_gattdb_add_service(gattdb_session_id,
                                 sl_bt_gattdb_primary_service,
@@ -117,7 +116,7 @@ void ble_initialize_gatt_db() {
   // UUID: a407519d-e808-4d63-b719-5b95ddade041
   // TODO: Use indicate for ToF? Then the client has to ack them
   const uuid_128 tof_characteristic_uuid = {
-    .data = {0xa4,0x07,0x51,0x9d,0xe8,0x08,0x4d,0x63,0xb7,0x19,0x5b,0x95,0xdd,0xad,0xe0,0x41}
+    .data = { 0xa4, 0x07, 0x51, 0x9d, 0xe8, 0x08, 0x4d, 0x63, 0xb7, 0x19, 0x5b, 0x95, 0xdd, 0xad, 0xe0, 0x41 }
   };
   sc = sl_bt_gattdb_add_uuid128_characteristic(gattdb_session_id,
                                                custom_service_handle,
@@ -128,7 +127,7 @@ void ble_initialize_gatt_db() {
                                                sl_bt_gattdb_fixed_length_value,
                                                sizeof(last_tof),
                                                sizeof(last_tof),
-                                               (const uint8_t*)&last_tof,
+                                               (const uint8_t *)&last_tof,
                                                &tof_characteristic_handle);
   app_assert_status(sc);
 
@@ -175,19 +174,18 @@ void ble_initialize_gatt_db() {
 }
 
 // add a characteristic with a 16-bit UUID and a fixed (read-only) value
-sl_status_t ble_gatt_add_fixed_characteristic_16(const uint16_t uuid, const uint16_t gattdb_session_id, uint16_t service_handle, const char* value, size_t value_length)
-{
+sl_status_t ble_gatt_add_fixed_characteristic_16(const uint16_t uuid, const uint16_t gattdb_session_id, uint16_t service_handle, const char *value, size_t value_length) {
   sl_bt_uuid_16_t characteristic_uuid = { .data = { (uint8_t)(uuid & 0xFF), (uint8_t)(uuid >> 8) } };
   uint16_t characteristic_handle;
   return sl_bt_gattdb_add_uuid16_characteristic(gattdb_session_id,
-                                              service_handle,
-                                              SL_BT_GATTDB_CHARACTERISTIC_READ,
-                                              0x00,
-                                              0x00,
-                                              characteristic_uuid,
-                                              sl_bt_gattdb_fixed_length_value,
-                                              value_length,
-                                              value_length,
-                                              (const uint8_t*)value,
-                                              &characteristic_handle);
+                                                service_handle,
+                                                SL_BT_GATTDB_CHARACTERISTIC_READ,
+                                                0x00,
+                                                0x00,
+                                                characteristic_uuid,
+                                                sl_bt_gattdb_fixed_length_value,
+                                                value_length,
+                                                value_length,
+                                                (const uint8_t *)value,
+                                                &characteristic_handle);
 }
