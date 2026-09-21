@@ -130,6 +130,40 @@ void ble_initialize_gatt_db() {
                                                sizeof(last_tof),
                                                (const uint8_t*)&last_tof,
                                                &tof_characteristic_handle);
+  app_assert_status(sc);
+
+  // 0x2904 Format descriptor for ToF characteristic
+  sl_bt_uuid_16_t format_desc_uuid = { .data = { 0x04, 0x29 } };
+  // Format: 0x06 (uint16), Exponent: 0x00, Unit: 0x2703 (Seconds), Namespace: 0x01 (SIG), Description: 0x0000
+  const uint8_t seconds_format_descriptor[] = { 0x06, 0x00, 0x03, 0x27, 0x01, 0x00, 0x00 };
+  uint16_t desc_handle;
+  sc = sl_bt_gattdb_add_uuid16_descriptor(gattdb_session_id,
+                                          tof_characteristic_handle,
+                                          SL_BT_GATTDB_DESCRIPTOR_READ,
+                                          0x00,
+                                          format_desc_uuid,
+                                          sl_bt_gattdb_fixed_length_value,
+                                          sizeof(seconds_format_descriptor),
+                                          sizeof(seconds_format_descriptor),
+                                          seconds_format_descriptor,
+                                          &desc_handle);
+  app_assert_status(sc);
+
+  // 0x2901 Description ("name") descriptor for ToF characteristic
+  sl_bt_uuid_16_t description_desc_uuid = { .data = { 0x01, 0x29 } };
+  const char *characteristic_name = "Time of flight";
+  uint8_t name_length = (uint8_t)strlen(characteristic_name);
+  sc = sl_bt_gattdb_add_uuid16_descriptor(gattdb_session_id,
+                                          tof_characteristic_handle,
+                                          SL_BT_GATTDB_DESCRIPTOR_READ,
+                                          0x00,
+                                          description_desc_uuid,
+                                          sl_bt_gattdb_fixed_length_value,
+                                          name_length,
+                                          name_length,
+                                          (const uint8_t *)characteristic_name,
+                                          &desc_handle);
+  app_assert_status(sc);
 
   // Start custom BLE service
   sc = sl_bt_gattdb_start_service(gattdb_session_id, custom_service_handle);
