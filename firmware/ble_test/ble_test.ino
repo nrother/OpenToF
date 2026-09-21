@@ -36,7 +36,9 @@ void loop() {
     sc = sl_bt_gatt_server_write_attribute_value(tof_characteristic_handle, 0, sizeof(last_tof), (const uint8_t *)&last_tof);
     app_assert_status(sc);
     sc = sl_bt_gatt_server_notify_all(tof_characteristic_handle, sizeof(last_tof), (const uint8_t *)&last_tof);
-    last_tof++;  // DEBUG, just increase ToF
+    
+    last_tof = 1000 + random(-300, 300); //DEBUG: Random ToF
+
     if (sc == SL_STATUS_OK) {
       Serial.println("Send ToF notification!");
     }
