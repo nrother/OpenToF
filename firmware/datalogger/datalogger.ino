@@ -34,8 +34,15 @@ struct __attribute__((packed)) ImuSample
 
 static_assert(sizeof(ImuSample) == 12, "Unexpected packet size");
 
-void sendSample(const ImuSample &sample)
+void sendSample(const uint16_t debugData, const ImuSample &sample)
 {
+  static uint16_t packetCounter = 0;
+
+  Serial.write(0xAA); // marker byte 1
+  Serial.write(0x55); // marker byte 2
+  Serial.write(reinterpret_cast<const uint8_t *>(&packetCounter), sizeof(packetCounter));
+  packetCounter++;
+  Serial.write(reinterpret_cast<const uint8_t *>(&debugData), sizeof(debugData));
   Serial.write(reinterpret_cast<const uint8_t *>(&sample),
                sizeof(sample));
 }
@@ -43,15 +50,15 @@ void sendSample(const ImuSample &sample)
 void sendSampleAscii(const ImuSample &sample)
 {
   Serial.print(myIMU.calcAccel(sample.ax), 3);
-  Serial.write("\,");
+  Serial.write(",");
   Serial.print(myIMU.calcAccel(sample.ay), 3);
-  Serial.write("\,");
+  Serial.write(",");
   Serial.print(myIMU.calcAccel(sample.az), 3);
-  Serial.write("\,");
+  Serial.write(",");
   Serial.print(myIMU.calcGyro(sample.gx), 3);
-  Serial.write("\,");
+  Serial.write(",");
   Serial.print(myIMU.calcGyro(sample.gy), 3);
-  Serial.write("\,");
+  Serial.write(",");
   Serial.print(myIMU.calcGyro(sample.gz), 3);
   Serial.write("\n");
 }
@@ -90,6 +97,8 @@ void setup()
 
   myIMU.settings.accelFifoEnabled = 1;
   myIMU.settings.accelFifoDecimation = 1;
+
+  // myIMU.settings.timestampFifoEnabled = 1;
 
   // FIFO configuration.
   myIMU.settings.fifoSampleRate = FIFO_ODR_HZ;
@@ -150,7 +159,7 @@ void loop()
     myIMU.readRegisterRegion(reinterpret_cast<uint8_t *>(&sample), LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(sample));
 
     if (!ascii_mode) {
-        sendSample(sample);
+        sendSample(words, sample);
     } else {
         sendSampleAscii(sample);
     }
