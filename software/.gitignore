@@ -1,0 +1,4 @@
+__pycache__
+
+# Raw sensor recordings / dumps produced by dump_data.py and the datalogger firmware — never commit these.
+*.csv
