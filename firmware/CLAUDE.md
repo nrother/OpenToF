@@ -27,5 +27,5 @@ Compile check (works from PowerShell, ~1 min, run from inside `firmware/`): the 
 `$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_arduino --build-path <tmp> OpenToF_Firmware`.
 
 ## Other files in this folder
-`datalogger/`, `ble_test/` and `deep_sleep_test/` are standalone preliminary/reference sketches, not part of
+`datalogger_selfmade/`, `ble_test/` and `deep_sleep_test/` are standalone preliminary/reference sketches, not part of
 `OpenToF_Firmware/`. Hardware datasheets (battery, IMU, board schematic) live in `../docs/hardware/`, not here.

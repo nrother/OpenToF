@@ -24,7 +24,7 @@ repo, for every agent session, no exceptions.
   — regardless of the permission/auto mode the session is running in. Describe what you're about to commit or
   switch to; don't just do it and mention it afterwards.
 - **Version bumps.** Before a commit that changes code in the Flutter app (`app/`) or the **main** firmware
-  sketch (`firmware/OpenToF_Firmware/` — not the helper sketches/scripts: `firmware/datalogger/`,
+  sketch (`firmware/OpenToF_Firmware/` — not the helper sketches/scripts: `firmware/datalogger_selfmade/`,
   `firmware/ble_test/`, `firmware/deep_sleep_test/`, or `software/`), ask the user whether it's a **major**,
   **minor**, or **hotfix/patch** bump, and bump the corresponding version as part of that same commit:
   - Flutter app: `version:` in `app/pubspec.yaml` (`MAJOR.MINOR.PATCH+BUILD`; bump the build number too).
