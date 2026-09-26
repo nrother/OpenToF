@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "pyserial",
+# ]
+# ///
+
 import argparse
 import serial
 import struct

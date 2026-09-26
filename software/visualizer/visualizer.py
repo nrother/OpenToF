@@ -1,3 +1,13 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "scipy",
+#     "matplotlib",
+#     "pyserial",
+#     "AHRS",
+#     "PyQt6",
+# ]
+# ///
 import serial
 import numpy as np
 from ahrs.filters import Madgwick
