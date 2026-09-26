@@ -5,3 +5,6 @@ __pycache__
 .idea/
 *.iml
 .dart_tool/
+
+# Third-party reference model, not redistributed; download it yourself (see cad/README.md).
+cad/Veriflite.stl

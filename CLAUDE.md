@@ -9,6 +9,8 @@ This is a small monorepo:
 - `software/` — standalone Python tools for dumping/plotting raw sensor data. Unrelated to the app/firmware
   BLE protocol; no CLAUDE.md of its own yet.
 - `img/` — shared branding source (e.g. the OpenToF logo); not owned by `app/`.
+- `cad/` — FreeCAD sensor housing with trampoline clip. `cad/opentof_housing.py` is the parametric source;
+  the `.FCStd` and `stl/` are generated from it. See `cad/README.md`.
 - `docs/DECISIONS.md` — resolved product/engineering decisions for the whole project (app **and** firmware);
   **overrides** any spec on conflict.
 - `docs/PLAN.md` — architecture + milestone checklist across app and firmware.
