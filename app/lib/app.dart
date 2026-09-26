@@ -11,8 +11,8 @@ import 'ui/main/main_screen.dart';
 class OpenToFApp extends ConsumerWidget {
   const OpenToFApp({super.key});
 
-  /// Blue of the OpenToF logo (sampled from assets/images/OpenToF_logo.png).
-  static const _seed = Color(0xFF0052EE);
+  /// Blue of the OpenToF logo (img/opentof-logo.svg).
+  static const _seed = Color(0xFF0153E3);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

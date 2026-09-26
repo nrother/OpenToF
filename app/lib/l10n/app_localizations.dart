@@ -260,6 +260,24 @@ abstract class AppLocalizations {
   /// **'paused'**
   String get chartPaused;
 
+  /// No description provided for @chartRoutineStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine started'**
+  String get chartRoutineStarted;
+
+  /// No description provided for @chartRoutineStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine stopped'**
+  String get chartRoutineStopped;
+
+  /// No description provided for @chartImplausibleJump.
+  ///
+  /// In en, this message translates to:
+  /// **'Implausible jump (ignored)'**
+  String get chartImplausibleJump;
+
   /// No description provided for @pauseChart.
   ///
   /// In en, this message translates to:
@@ -710,11 +728,11 @@ abstract class AppLocalizations {
   /// **'Single jump'**
   String get simSingleJump;
 
-  /// No description provided for @simDropLanding.
+  /// No description provided for @simDropJump.
   ///
   /// In en, this message translates to:
-  /// **'Drop next landing'**
-  String get simDropLanding;
+  /// **'Drop next jump'**
+  String get simDropJump;
 
   /// No description provided for @simDisconnect.
   ///
@@ -727,6 +745,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Simulate reconnect'**
   String get simReconnect;
+
+  /// No description provided for @uncertainJumpWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is unsure about this jump'**
+  String get uncertainJumpWarning;
+
+  /// No description provided for @confidenceValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence: {value} %'**
+  String confidenceValue(int value);
+
+  /// No description provided for @versionMismatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor firmware doesn\'t match this app'**
+  String get versionMismatchTitle;
+
+  /// No description provided for @versionMismatchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'App {app}, sensor firmware {firmware}. Update the older one, otherwise jumps may not be received.'**
+  String versionMismatchBody(String app, String firmware);
+
+  /// No description provided for @sensorDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor details'**
+  String get sensorDetails;
+
+  /// No description provided for @algorithmSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Detection algorithm'**
+  String get algorithmSection;
+
+  /// No description provided for @protocolVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol version'**
+  String get protocolVersionLabel;
+
+  /// No description provided for @bootCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor starts'**
+  String get bootCountLabel;
+
+  /// No description provided for @confidenceKindLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence'**
+  String get confidenceKindLabel;
+
+  /// No description provided for @confidenceKindNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not provided'**
+  String get confidenceKindNone;
+
+  /// No description provided for @confidenceKindHeuristic.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate (higher = more reliable)'**
+  String get confidenceKindHeuristic;
+
+  /// No description provided for @confidenceKindCalibrated.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrated probability'**
+  String get confidenceKindCalibrated;
+
+  /// No description provided for @reasonsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasons for uncertainty'**
+  String get reasonsLabel;
+
+  /// No description provided for @customFieldsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra values per jump'**
+  String get customFieldsLabel;
+
+  /// No description provided for @noneProvided.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get noneProvided;
+
+  /// No description provided for @fieldOnTakeoff.
+  ///
+  /// In en, this message translates to:
+  /// **'at takeoff'**
+  String get fieldOnTakeoff;
+
+  /// No description provided for @fieldOnLanding.
+  ///
+  /// In en, this message translates to:
+  /// **'at landing'**
+  String get fieldOnLanding;
+
+  /// No description provided for @fieldOnBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'at takeoff and landing'**
+  String get fieldOnBoth;
+
+  /// No description provided for @fieldRelative.
+  ///
+  /// In en, this message translates to:
+  /// **'relative values'**
+  String get fieldRelative;
+
+  /// No description provided for @displaySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump display'**
+  String get displaySection;
+
+  /// No description provided for @showContactTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Show time on bed'**
+  String get showContactTime;
+
+  /// No description provided for @showContactTimeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact time before each jump'**
+  String get showContactTimeHelp;
+
+  /// No description provided for @showTotalTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Show total jump time'**
+  String get showTotalTime;
+
+  /// No description provided for @showTotalTimeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Time on bed + flight time'**
+  String get showTotalTimeHelp;
+
+  /// No description provided for @contactLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bed'**
+  String get contactLabel;
+
+  /// No description provided for @totalTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bed+Flight'**
+  String get totalTimeLabel;
+
+  /// No description provided for @columnSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} (s)'**
+  String columnSeconds(String label);
+
+  /// No description provided for @exportChooserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as CSV'**
+  String get exportChooserTitle;
+
+  /// No description provided for @exportRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded routine'**
+  String get exportRoutine;
+
+  /// No description provided for @exportLastWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {window}'**
+  String exportLastWindow(String window);
+
+  /// No description provided for @jumpCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 jump} other{{count} jumps}}'**
+  String jumpCount(int count);
+
+  /// No description provided for @showJumpDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more jump details'**
+  String get showJumpDetails;
+
+  /// No description provided for @showJumpDetailsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra values from the sensor under the last jump and in the routine table. Tap a jump for all its details.'**
+  String get showJumpDetailsHelp;
+
+  /// No description provided for @detailsToShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Values to show'**
+  String get detailsToShow;
+
+  /// No description provided for @detailsNoSensorValues.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect a sensor to see which values it provides.'**
+  String get detailsNoSensorValues;
+
+  /// No description provided for @jumpDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump details'**
+  String get jumpDetailsTitle;
+
+  /// No description provided for @landedAtLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Landed at'**
+  String get landedAtLabel;
+
+  /// No description provided for @flightTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight time'**
+  String get flightTimeLabel;
+
+  /// No description provided for @contactTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Time on bed'**
+  String get contactTimeLabel;
+
+  /// No description provided for @totalJumpTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total time (bed + flight)'**
+  String get totalJumpTimeLabel;
+
+  /// No description provided for @stageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get stageLabel;
+
+  /// No description provided for @stageFinal.
+  ///
+  /// In en, this message translates to:
+  /// **'Final'**
+  String get stageFinal;
+
+  /// No description provided for @stageProvisional.
+  ///
+  /// In en, this message translates to:
+  /// **'Provisional (sensor\'s first estimate)'**
+  String get stageProvisional;
 }
 
 class _AppLocalizationsDelegate

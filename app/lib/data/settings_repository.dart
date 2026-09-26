@@ -16,7 +16,15 @@ class AppSettings {
     this.pairedDeviceName,
     this.useMockSensor = false,
     this.themeMode = AppThemeMode.system,
+    this.showContactTime = false,
+    this.showTotalTime = false,
+    this.showJumpDetails = false,
+    this.hiddenDetails = const [],
   });
+
+  /// Key of the sensor's confidence in [hiddenDetails]; custom fields use
+  /// their own id.
+  static const confidenceDetail = '_confidence';
 
   static const defaultTimeoutSeconds = 4;
   static const minTimeoutSeconds = 1;
@@ -47,6 +55,23 @@ class AppSettings {
 
   final AppThemeMode themeMode;
 
+  /// Show the time on the bed before each jump next to its flight time.
+  final bool showContactTime;
+
+  /// Show each jump's total time (time on the bed + flight time).
+  final bool showTotalTime;
+
+  /// Show the sensor's extra per-jump information (confidence, custom values)
+  /// under the last jump and in the routine table, and a details sheet on tap.
+  final bool showJumpDetails;
+
+  /// Details the user switched off (stored as "hidden" so values a new
+  /// algorithm adds appear by default).
+  final List<String> hiddenDetails;
+
+  bool detailVisible(String key) =>
+      showJumpDetails && !hiddenDetails.contains(key);
+
   Duration get inactivityTimeout => Duration(seconds: inactivityTimeoutSeconds);
   Duration get window => Duration(seconds: windowSeconds);
   bool get isPaired => pairedDeviceId != null;
@@ -59,6 +84,10 @@ class AppSettings {
     int? jumpsPerRoutine,
     bool? useMockSensor,
     AppThemeMode? themeMode,
+    bool? showContactTime,
+    bool? showTotalTime,
+    bool? showJumpDetails,
+    List<String>? hiddenDetails,
   }) => AppSettings(
     inactivityTimeoutSeconds:
         inactivityTimeoutSeconds ?? this.inactivityTimeoutSeconds,
@@ -70,6 +99,10 @@ class AppSettings {
     pairedDeviceName: pairedDeviceName,
     useMockSensor: useMockSensor ?? this.useMockSensor,
     themeMode: themeMode ?? this.themeMode,
+    showContactTime: showContactTime ?? this.showContactTime,
+    showTotalTime: showTotalTime ?? this.showTotalTime,
+    showJumpDetails: showJumpDetails ?? this.showJumpDetails,
+    hiddenDetails: hiddenDetails ?? this.hiddenDetails,
   );
 
   AppSettings withPaired(String? id, String? name) => AppSettings(
@@ -82,6 +115,10 @@ class AppSettings {
     pairedDeviceName: name,
     useMockSensor: useMockSensor,
     themeMode: themeMode,
+    showContactTime: showContactTime,
+    showTotalTime: showTotalTime,
+    showJumpDetails: showJumpDetails,
+    hiddenDetails: hiddenDetails,
   );
 }
 
@@ -99,6 +136,10 @@ class SettingsRepository {
   static const _kPairedName = 'paired_device_name';
   static const _kMock = 'use_mock_sensor';
   static const _kTheme = 'theme_mode';
+  static const _kShowContact = 'show_contact_time';
+  static const _kShowTotal = 'show_total_time';
+  static const _kShowDetails = 'show_jump_details';
+  static const _kHiddenDetails = 'hidden_jump_details';
 
   AppSettings load() {
     const d = AppSettings();
@@ -121,6 +162,10 @@ class SettingsRepository {
       themeMode:
           AppThemeMode.values.asNameMap()[_prefs.getString(_kTheme)] ??
           d.themeMode,
+      showContactTime: _prefs.getBool(_kShowContact) ?? d.showContactTime,
+      showTotalTime: _prefs.getBool(_kShowTotal) ?? d.showTotalTime,
+      showJumpDetails: _prefs.getBool(_kShowDetails) ?? d.showJumpDetails,
+      hiddenDetails: _prefs.getStringList(_kHiddenDetails) ?? d.hiddenDetails,
     );
   }
 
@@ -132,6 +177,10 @@ class SettingsRepository {
     await _prefs.setInt(_kJumps, s.jumpsPerRoutine);
     await _prefs.setBool(_kMock, s.useMockSensor);
     await _prefs.setString(_kTheme, s.themeMode.name);
+    await _prefs.setBool(_kShowContact, s.showContactTime);
+    await _prefs.setBool(_kShowTotal, s.showTotalTime);
+    await _prefs.setBool(_kShowDetails, s.showJumpDetails);
+    await _prefs.setStringList(_kHiddenDetails, s.hiddenDetails);
     if (s.pairedDeviceId == null) {
       await _prefs.remove(_kPairedId);
       await _prefs.remove(_kPairedName);

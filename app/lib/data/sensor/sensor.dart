@@ -1,3 +1,4 @@
+import '../../domain/algorithm_metadata.dart';
 import '../../domain/sensor_events.dart';
 
 enum SensorConnectionState { disconnected, connecting, connected }
@@ -55,8 +56,8 @@ class DeviceInfo {
 abstract class Sensor {
   String get id;
 
-  Stream<LandingEvent> get landings;
-  Stream<TakeoffEvent> get takeoffs;
+  /// Takeoff/landing events (provisional, final, retracted).
+  Stream<JumpEvent> get events;
 
   /// Battery level in percent (0-100).
   Stream<int> get batteryLevel;
@@ -79,6 +80,15 @@ abstract class Sensor {
   /// number, hardware/firmware revision, active algorithm). Never throws;
   /// unavailable fields come back null.
   Future<DeviceInfo> readDeviceInfo();
+
+  /// Protocol version, boot counter and current device time; null if
+  /// unavailable. Never throws.
+  Future<SensorInfo?> readSensorInfo();
+
+  /// What the sensor's algorithm puts into its events (custom fields, reason
+  /// names, confidence kind). Never throws; falls back to
+  /// [AlgorithmMetadata.none].
+  Future<AlgorithmMetadata> readAlgorithmMetadata();
 
   /// Releases all resources. The sensor must not be used afterwards.
   Future<void> dispose();

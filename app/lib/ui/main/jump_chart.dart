@@ -19,6 +19,7 @@ class JumpChart extends StatelessWidget {
     required this.nowLabel,
     this.events = const [],
     this.height = 180,
+    this.onJumpTap,
   });
 
   final List<Jump> jumps;
@@ -31,47 +32,109 @@ class JumpChart extends StatelessWidget {
   final String nowLabel;
   final double height;
 
+  /// Called with the bar nearest to a tap (within a finger's width); null
+  /// disables tapping.
+  final void Function(Jump)? onJumpTap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: height,
       width: double.infinity,
-      child: CustomPaint(
-        painter: JumpChartPainter(
-          jumps: jumps,
-          now: now,
-          window: window,
-          barColor: scheme.primary,
-          warnColor: scheme.error,
-          gridColor: scheme.outlineVariant,
-          textStyle:
-              Theme.of(context).textTheme.labelSmall ?? const TextStyle(),
-          textColor: scheme.onSurfaceVariant,
-          formatAxis: formatAxis,
-          startLabel: startLabel,
-          midLabel: midLabel,
-          nowLabel: nowLabel,
-          events: events,
-          connectedColor: connectedEventColor,
-          disconnectedColor: scheme.error,
+      child: LayoutBuilder(
+        builder: (context, constraints) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: onJumpTap == null
+              ? null
+              : (d) {
+                  final j = jumpAtX(
+                    jumps,
+                    now,
+                    window,
+                    constraints.maxWidth,
+                    d.localPosition.dx,
+                  );
+                  if (j != null) onJumpTap!(j);
+                },
+          child: _paint(context, scheme),
         ),
       ),
     );
   }
+
+  Widget _paint(BuildContext context, ColorScheme scheme) => CustomPaint(
+    painter: JumpChartPainter(
+      jumps: jumps,
+      now: now,
+      window: window,
+      barColor: scheme.primary,
+      warnColor: scheme.error,
+      gridColor: scheme.outlineVariant,
+      textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(),
+      textColor: scheme.onSurfaceVariant,
+      formatAxis: formatAxis,
+      startLabel: startLabel,
+      midLabel: midLabel,
+      nowLabel: nowLabel,
+      events: events,
+      eventColor: (t) => chartEventColor(t, scheme),
+    ),
+  );
 }
 
 /// Marker color for a sensor-connected event (same green as the status indicator).
 final Color connectedEventColor = Colors.green.shade600;
 
 /// Icon drawn for an event marker.
-IconData chartEventIcon(ChartEventType t) => t == ChartEventType.connected
-    ? Icons.bluetooth_connected
-    : Icons.bluetooth_disabled;
+IconData chartEventIcon(ChartEventType t) => switch (t) {
+  ChartEventType.connected => Icons.bluetooth_connected,
+  ChartEventType.disconnected => Icons.bluetooth_disabled,
+  ChartEventType.routineStarted => Icons.play_arrow,
+  ChartEventType.routineStopped => Icons.stop,
+  ChartEventType.implausibleJump => Icons.warning_amber_rounded,
+};
+
+/// Marker color for an event, using the theme where an event isn't inherently
+/// colored (e.g. connected is always green, regardless of theme).
+Color chartEventColor(ChartEventType t, ColorScheme scheme) => switch (t) {
+  ChartEventType.connected => connectedEventColor,
+  ChartEventType.disconnected => scheme.error,
+  ChartEventType.routineStarted => scheme.primary,
+  ChartEventType.routineStopped => scheme.secondary,
+  ChartEventType.implausibleJump => scheme.error,
+};
 
 /// True if an event falls inside the window ending at [now].
 bool eventInWindow(ChartEvent e, DateTime now, Duration window) =>
     !e.at.isBefore(now.subtract(window)) && !e.at.isAfter(now);
+
+/// The visible jump whose bar is nearest to [x] (in a chart [width] wide),
+/// if one is within 16 px.
+Jump? jumpAtX(
+  List<Jump> jumps,
+  DateTime now,
+  Duration window,
+  double width,
+  double x,
+) {
+  final left = JumpChartPainter._left;
+  final plotWidth = width - left - JumpChartPainter._right;
+  final start = now.subtract(window);
+  Jump? best;
+  var bestDist = 16.0;
+  for (final j in jumps) {
+    if (!jumpInWindow(j, now, window)) continue;
+    final frac =
+        j.landedAt.difference(start).inMilliseconds / window.inMilliseconds;
+    final dist = (left + frac * plotWidth - x).abs();
+    if (dist <= bestDist) {
+      best = j;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
 
 /// True if [jump] falls inside the window ending at [now].
 bool jumpInWindow(Jump jump, DateTime now, Duration window) {
@@ -103,14 +166,12 @@ class JumpChartPainter extends CustomPainter {
     required this.midLabel,
     required this.nowLabel,
     this.events = const [],
-    this.connectedColor = Colors.green,
-    this.disconnectedColor = Colors.red,
+    required this.eventColor,
   });
 
   final List<Jump> jumps;
   final List<ChartEvent> events;
-  final Color connectedColor;
-  final Color disconnectedColor;
+  final Color Function(ChartEventType) eventColor;
   final DateTime now;
   final Duration window;
   final Color barColor;
@@ -190,7 +251,7 @@ class JumpChartPainter extends CustomPainter {
     );
   }
 
-  /// Sensor connect/disconnect: a vertical line through the plot with an icon
+  /// Sensor and routine events: a vertical line through the plot with an icon
   /// above it, drawn over the bars.
   void _paintEvents(Canvas canvas, Rect plot, DateTime start) {
     final windowMs = window.inMilliseconds;
@@ -198,9 +259,7 @@ class JumpChartPainter extends CustomPainter {
       if (!eventInWindow(e, now, window)) continue;
       final frac = e.at.difference(start).inMilliseconds / windowMs;
       final x = plot.left + frac * plot.width;
-      final color = e.type == ChartEventType.connected
-          ? connectedColor
-          : disconnectedColor;
+      final color = eventColor(e.type);
       canvas.drawLine(
         Offset(x, plot.top),
         Offset(x, plot.bottom),

@@ -1,31 +1,28 @@
 // ============================================================================
 // AzPipelineJumpDetector -- causal/online port of the az-only pipeline described in
-// tmp/third_data/opentof-az-verarbeitungspipeline-zur-sprungerkennung.md, following
-// that document's own "Implementierungshinweise für den MGM240S":
-//   - filtfilt -> a one-sided IIR Butterworth, same coefficients, forward only.
+// docs/reference/batch3/opentof-az-verarbeitungspipeline-zur-sprungerkennung.md, following
+// that document's own "Implementierungshinweise für den MGM240S". Algorithm interface v1.
+//   - filtfilt -> a one-sided 4th-order Butterworth (5 Hz), forward only.
 //   - find_peaks (whole contact block) -> "track the last sample where az, after a
 //     minimum, again exceeds a threshold" -- a causal proxy for the 2nd maximum.
-//   - median(7) is kept (trailing instead of centered) rather than swapped for the
-//     document's EMA alternative -- a 7-tap running median is cheap enough on this
-//     MCU that the extra robustness against single-sample I2C spikes isn't worth
-//     giving up.
-//   - the fixed +33ms landing correction carries over unchanged.
+//   - median(7), trailing; the fixed +33 ms landing correction carries over.
 //
-// This is a *direct* port of analysis/third_data/az_pipeline_online.py -- read that
-// file's module docstring first. Validated there against tmp/third_data/take2.csv
-// and take4.csv: 84/98 real jumps matched, landing MAE ~30-55ms, takeoff MAE
-// ~95-125ms (takeoff visibly weaker than landing -- consistent with *every other*
-// detector built in this project; see that docstring for why).
+// Port of online_detect() in src/opentof_research/detectors/az_pipeline.py -- read
+// that module docstring first. Batch 3: 84/98 real jumps matched, 76 ms mean timing
+// error -- the weakest of the real-time options; kept as a documented comparison
+// baseline. **Prefer BedCycleJumpDetector.h (or StaLtaJumpDetector.h).**
 //
-// IMPORTANT: analysis/third_data/compare_algorithms.py measures this design as the
-// weakest of the three real-time-relevant options on the reference recordings --
-// 84/98 matched, 76ms mean timing error, vs. StaLtaJumpDetector.h's 96/98 matched,
-// 54ms. It exists because it was explicitly asked for (a faithful implementation of
-// the source document's own online design, to compare against), not because it's
-// the recommended choice -- **prefer StaLtaJumpDetector.h for production use.**
-// This file is kept as a documented, working alternative and a real example of what
-// "port the offline algorithm's own suggested online simplification" costs in
-// practice versus a self-normalizing from-scratch design.
+// Interface v1 usage: FINAL events only, no confidence/reasons/fields. The landing
+// is reported when a candidate is confirmed (backdated to the candidate + 33 ms), the
+// takeoff once the contact is confirmed over (backdated to the 2nd-max candidate,
+// typically ~100 ms later -- within the 200 ms deadline). Events the firmware would
+// drop are never sent (landing only after a reported takeoff and vice versa).
+//
+// Sample rate: v1 had the Butterworth coefficients hard-coded for 833 Hz, but the MCU
+// delivers ~285 samples/s -- that silently moved the 5 Hz cutoff to ~1.7 Hz. v2
+// designs the filter at runtime from the measured sample interval (two biquads,
+// Butterworth Q = 0.5412 / 1.3066, bilinear with prewarping == scipy butter(4, 5 Hz)).
+// All other durations are in seconds; only the median window is in samples.
 // ============================================================================
 #pragma once
 
@@ -36,12 +33,9 @@
 
 class AzPipelineJumpDetector : public JumpDetector {
  public:
-  const char* name() const override { return "AzPipelineJumpDetector v1"; }
+  const char* name() const override { return "AzPipeline v2"; }
 
-  // The reference recordings peaked near 16g -- same reasoning as
-  // StaLtaJumpDetector.h. The Butterworth coefficients below are derived for this
-  // exact rate (see kSos); if you change the profile, regenerate them (see the
-  // comment above kSos for how).
+  // Landings peak near 16 g; the filter adapts to the delivered sample rate.
   const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
 
   void begin() override {
@@ -49,6 +43,9 @@ class AzPipelineJumpDetector : public JumpDetector {
     _medianCount = 0;
     _medianHead = 0;
     for (int s = 0; s < 2; s++) { _z1[s] = 0.0f; _z2[s] = 0.0f; }
+    _nSamples = 0;
+    _dtSum = 0.0;
+    _designed = false;
 
     _gravitySum = 0.0;
     _gravityCount = 0;
@@ -66,30 +63,33 @@ class AzPipelineJumpDetector : public JumpDetector {
     _contactStartS = 0.0f;
     _tSeconds = 0.0f;
     _prevAbovePeak = false;
+    _inAirReported = false;
   }
 
   void onSample(const ImuData& s) override {
+    // ---- 0) design the Butterworth from the measured sample interval ----
+    if (_nSamples > 0) _dtSum += (double)s.dt;
+    _nSamples++;
+    if (!_designed && _nSamples > kDesignSamples) designButterworth((float)(_dtSum / (double)(_nSamples - 1)));
+
     // ---- 1) median(7), trailing (causal) ----
     _medianBuf[_medianHead] = s.az;
     _medianHead = (_medianHead + 1) % 7;
     if (_medianCount < 7) _medianCount++;
     const float med = medianOfBuffer();
 
-    // ---- 2) causal Butterworth (forward-only, 2 cascaded biquads, Direct Form II
-    // Transposed -- 2 state floats per section, matches scipy's SOS convention) ----
-    const float filtered = biquadCascade(med);
+    // ---- 2) causal Butterworth (2 cascaded biquads, Direct Form II Transposed) ----
+    const float filtered = _designed ? biquadCascade(med) : med;
 
     _tSeconds += s.dt;
 
-    // ---- 3) one-time gravity calibration (first ~1.2s, same window the offline
-    // pipeline uses) -- also doubles as the filter's warm-up period: detection only
-    // starts once this is done, so the Butterworth's zero-initial-state transient
-    // (which otherwise produces a spurious first "landing") has already settled. ----
+    // ---- 3) one-time gravity calibration (first ~1.2 s) -- doubles as the filter's
+    // warm-up: detection only starts once this is done. ----
     if (!_gravityReady) {
       _gravitySum += s.az;
       _gravityCount++;
       _calibSeconds += s.dt;
-      if (_calibSeconds >= kGravityCalibS) {
+      if (_calibSeconds >= kGravityCalibS && _designed) {
         _gravityZ = (float)(_gravitySum / _gravityCount);
         _gravityReady = true;
       }
@@ -101,7 +101,6 @@ class AzPipelineJumpDetector : public JumpDetector {
 
     if (!_inContact) {
       if (!_haveLandingCandidate) {
-        // watch for the first rise through the zero threshold out of quiet
         if (fabsf(a) > kZeroThreshG && _secondsSinceLastEvent >= kMinFlightS) {
           _haveLandingCandidate = true;
           _landingCandidateUs = s.timeUs;
@@ -110,9 +109,11 @@ class AzPipelineJumpDetector : public JumpDetector {
         if (fabsf(a) < kZeroThreshG) {
           _haveLandingCandidate = false;  // dipped back down without confirming -- noise, cancel
         } else if (fabsf(a) > kDetectThreshG) {
-          // Confirmed: a real contact. Report the *candidate's* time (backdated),
-          // +33ms fixed correction -- same as the offline pipeline's landing_correction.
-          landing(_landingCandidateUs + kLandingCorrectionUs);
+          // Confirmed contact: report the candidate's time (backdated) + 33 ms.
+          if (_inAirReported) {
+            landing(_landingCandidateUs + kLandingCorrectionUs, STAGE_FINAL);
+            _inAirReported = false;
+          }
           _inContact = true;
           _contactStartS = _tSeconds;
           _haveTakeoffCandidate = true;
@@ -125,11 +126,7 @@ class AzPipelineJumpDetector : public JumpDetector {
       _prevAbovePeak = a > kPeakHeightG;
     } else {
       const bool abovePeak = a > kPeakHeightG;
-      // Bound candidate updates to shortly after landing: the physical model
-      // (a=0 -> 1st max -> trough -> 2nd max -> takeoff) completes quickly (real
-      // contacts run ~0.35-0.5s). Without this bound, a noisy ringdown keeps
-      // re-triggering "the last rising edge" far past the true 2nd maximum -- traced
-      // against real data before this bound was added (see the .py docstring).
+      // Bound candidate updates to shortly after landing (see the .py docstring).
       if (abovePeak && !_prevAbovePeak && (_tSeconds - _contactStartS) <= kMaxCandidateWindowS) {
         _haveTakeoffCandidate = true;
         _takeoffCandidateUs = s.timeUs;  // last rising-edge-after-a-dip wins, within the window
@@ -139,8 +136,9 @@ class AzPipelineJumpDetector : public JumpDetector {
       if (fabsf(a) < kZeroThreshG) {
         _quietSinceS += s.dt;
         if (_quietSinceS >= kConfirmS) {
-          if (_haveTakeoffCandidate) {
-            takeoff(_takeoffCandidateUs);
+          if (_haveTakeoffCandidate && !_inAirReported) {
+            takeoff(_takeoffCandidateUs, STAGE_FINAL);
+            _inAirReported = true;
           }
           _inContact = false;
           _secondsSinceLastEvent = 0.0f;
@@ -153,12 +151,10 @@ class AzPipelineJumpDetector : public JumpDetector {
   }
 
  private:
-  // ---- causal median(7): trailing window, small buffer, insertion-sort-on-copy ----
   float medianOfBuffer() {
     float tmp[7];
     for (int i = 0; i < _medianCount; i++) tmp[i] = _medianBuf[i];
-    // insertion sort -- 7 elements at most, trivially cheap
-    for (int i = 1; i < _medianCount; i++) {
+    for (int i = 1; i < _medianCount; i++) {   // insertion sort, <= 7 elements
       float key = tmp[i];
       int j = i - 1;
       while (j >= 0 && tmp[j] > key) { tmp[j + 1] = tmp[j]; j--; }
@@ -167,32 +163,40 @@ class AzPipelineJumpDetector : public JumpDetector {
     return tmp[_medianCount / 2];
   }
 
-  // ---- causal 4th-order Butterworth, 5 Hz cutoff, as 2 cascaded biquads ----
-  // Coefficients generated with:
-  //   scipy.signal.butter(4, 5.0 / (833.0 / 2), btype="low", output="sos")
-  // (833 Hz = PROFILE_833HZ_16G's rate; regenerate for a different profile/cutoff.)
-  // Direct Form II Transposed per section: y = b0*x + z1; z1' = b1*x - a1*y + z2;
-  // z2' = b2*x - a2*y. Each section's a0 is already normalized to 1 (scipy's SOS
-  // convention), matching this implementation.
-  static constexpr float kSosB0[2] = {1.2042139608e-07f, 1.0f};
-  static constexpr float kSosB1[2] = {2.4084279216e-07f, 2.0f};
-  static constexpr float kSosB2[2] = {1.2042139608e-07f, 1.0f};
-  static constexpr float kSosA1[2] = {-1.9313007236f, -1.9701501617f};
-  static constexpr float kSosA2[2] = {0.93267504116f, 0.97155212463f};
+  // 4th-order Butterworth low-pass = 2 biquads with Q = 1/(2cos(pi/8)), 1/(2cos(3pi/8)),
+  // bilinear transform with prewarping at the cutoff (== scipy butter(4, fc)).
+  void designButterworth(float dtAvg) {
+    const float fs = 1.0f / dtAvg;
+    const float k = tanf(3.14159265358979f * kCutoffHz / fs);
+    const float k2 = k * k;
+    static const float q[2] = {0.54119610f, 1.30656296f};
+    for (int s = 0; s < 2; s++) {
+      const float norm = 1.0f / (1.0f + k / q[s] + k2);
+      _b0[s] = k2 * norm;
+      _b1[s] = 2.0f * _b0[s];
+      _b2[s] = _b0[s];
+      _a1[s] = 2.0f * (k2 - 1.0f) * norm;
+      _a2[s] = (1.0f - k / q[s] + k2) * norm;
+      _z1[s] = _z2[s] = 0.0f;
+    }
+    _designed = true;
+  }
 
   float biquadCascade(float x) {
     float in = x;
     for (int s = 0; s < 2; s++) {
-      const float y = kSosB0[s] * in + _z1[s];
-      _z1[s] = kSosB1[s] * in - kSosA1[s] * y + _z2[s];
-      _z2[s] = kSosB2[s] * in - kSosA2[s] * y;
+      const float y = _b0[s] * in + _z1[s];
+      _z1[s] = _b1[s] * in - _a1[s] * y + _z2[s];
+      _z2[s] = _b2[s] * in - _a2[s] * y;
       in = y;
     }
     return in;
   }
 
-  // ---- tuned constants (grid-searched jointly on take2+take4 -- see README) ----
-  static constexpr float kGravityCalibS = 500.0f / 416.0f;  // ~1.2s -- same window as the offline pipeline
+  // ---- constants (batch-3 reference values; see README) ----
+  static constexpr float kCutoffHz = 5.0f;
+  static constexpr int kDesignSamples = 32;
+  static constexpr float kGravityCalibS = 500.0f / 416.0f;  // ~1.2 s -- same window as the offline pipeline
   static constexpr float kDetectThreshG = 0.3f;
   static constexpr float kZeroThreshG = 0.05f;
   static constexpr float kPeakHeightG = 0.15f;
@@ -205,7 +209,11 @@ class AzPipelineJumpDetector : public JumpDetector {
   float _medianBuf[7];
   int _medianCount = 0;
   int _medianHead = 0;
-  float _z1[2], _z2[2];  // biquad states
+  float _b0[2], _b1[2], _b2[2], _a1[2], _a2[2];
+  float _z1[2], _z2[2];
+  int _nSamples = 0;
+  double _dtSum = 0.0;
+  bool _designed = false;
 
   double _gravitySum = 0.0;
   uint32_t _gravityCount = 0;
@@ -223,4 +231,5 @@ class AzPipelineJumpDetector : public JumpDetector {
   float _contactStartS = 0.0f;
   float _tSeconds = 0.0f;
   bool _prevAbovePeak = false;
+  bool _inAirReported = false;   // mirror of the firmware's jump state
 };

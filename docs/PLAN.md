@@ -61,6 +61,9 @@ Not version-tracked here (the firmware changes too often for a plan checklist to
 - [x] App side: read Device Information (manufacturer/model/serial/hardware/firmware revision + active algorithm) in `ble_protocol.dart` and show it in Settings → Device info (see DECISIONS.md, 2026-09-22). **Confirmed working against a real sensor** (2026-09-22).
 - [ ] Flash with `DEMO_MODE 1`, connect with the app (real BLE), verify events/name/battery.
 - [ ] Write and tune the real detector in `MyJumpDetector` with real trampoline data.
+- [x] BLE protocol 1 (2026-09-26, firmware v0.4.0): event-based takeoff/landing with device timestamps, provisional/final/retract, confidence, reason bits, algorithm-described custom fields, boot counter (see DECISIONS.md). Firmware compiles (real + `DEMO_MODE 1`); app parses it, updates jumps in place, CSV has the new columns; all app tests pass (MockSensor only).
+- [ ] Flash v0.4.0 with `DEMO_MODE 1` and verify protocol 1 end-to-end with the app over real BLE (two-stage replacement, retraction, metadata reads incl. long reads > 22 bytes).
+- [ ] Algorithm team: report both stages from `BedCycleJumpDetector` via the new API (agreed-interface tab of the shared doc).
 
 ## Not verified / next steps (need hardware or SDKs this machine lacks)
 - [x] Android SDK 36 installed; `flutter build apk --debug` succeeds (manifest merge OK).
@@ -72,6 +75,7 @@ Not version-tracked here (the firmware changes too often for a plan checklist to
 - [x] Branding: new mark (launcher icon incl. themed icon, splash, notification icon, app bar), old wordmark in Settings, version in settings (see DECISIONS.md). Icons/splash/notification icon untested on a device.
 - [ ] Large polished logo (waiting for image generation): replace the Settings header logo with it (`BrandLogo`) and decide the theme seed colour.
 - [ ] Verify on a device: chart Pause/Resume, event markers with a real disconnect, routine length field (keyboard), theme selector.
+- [x] Chart: routine start/stop markers, and implausible-jump (>2.5 s) filtering with a chart warning marker (see DECISIONS.md, 2026-09-24). Verified against `MockSensor` only; not yet against a real sensor producing an actual glitchy reading.
 - [ ] Startup: a debug build took 14.5 s to first display on the moto g pro; check `flutter run --release` (AOT) is fast.
 - [ ] Verify on a device: notification Exit button, Settings exit, double-Back exit; also after swiping the app away from recents (then the button only stops the service).
 - [ ] Verify on a device: first scan with Bluetooth off / permissions not yet granted works without restarting the app.

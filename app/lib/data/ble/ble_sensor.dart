@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../domain/algorithm_metadata.dart';
 import '../../domain/sensor_events.dart';
 import '../sensor/sensor.dart';
 import 'ble_protocol.dart';
@@ -116,8 +117,7 @@ class BleSensor implements Sensor {
   static const _retryDelay = Duration(seconds: 2);
   static const _connectTimeout = Duration(seconds: 10);
 
-  final _landings = StreamController<LandingEvent>.broadcast();
-  final _takeoffs = StreamController<TakeoffEvent>.broadcast();
+  final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
   final _state = StreamController<SensorConnectionState>.broadcast();
 
@@ -130,9 +130,7 @@ class BleSensor implements Sensor {
   final List<StreamSubscription<dynamic>> _charSubs = [];
 
   @override
-  Stream<LandingEvent> get landings => _landings.stream;
-  @override
-  Stream<TakeoffEvent> get takeoffs => _takeoffs.stream;
+  Stream<JumpEvent> get events => _events.stream;
   @override
   Stream<int> get batteryLevel => _battery.stream;
   @override
@@ -197,13 +195,9 @@ class BleSensor implements Sensor {
     BluetoothCharacteristic? find(String service, String characteristic) =>
         _findChar(service, characteristic);
 
-    final landing = find(
+    final event = find(
       BleProtocol.jumpService,
-      BleProtocol.landingCharacteristic,
-    );
-    final takeoff = find(
-      BleProtocol.jumpService,
-      BleProtocol.takeoffCharacteristic,
+      BleProtocol.eventCharacteristic,
     );
     final battery = find(
       BleProtocol.batteryService,
@@ -211,24 +205,19 @@ class BleSensor implements Sensor {
     );
     _nameChar = find(BleProtocol.jumpService, BleProtocol.nameCharacteristic);
 
-    if (landing == null || takeoff == null) {
-      throw StateError('Jump service characteristics not found');
+    if (event == null) {
+      throw StateError('Jump event characteristic not found (old firmware?)');
     }
 
+    // onValueReceived (not lastValueStream): every notification counts, e.g. a
+    // provisional and a final event arriving back to back.
     _charSubs.add(
-      landing.onValueReceived.listen((v) {
-        final e = BleProtocol.parseLanding(v, DateTime.now());
-        if (e != null) _landings.add(e);
+      event.onValueReceived.listen((v) {
+        final e = BleProtocol.parseEvent(v, DateTime.now());
+        if (e != null) _events.add(e);
       }),
     );
-    _charSubs.add(
-      takeoff.onValueReceived.listen((v) {
-        final e = BleProtocol.parseTakeoff(v, DateTime.now());
-        if (e != null) _takeoffs.add(e);
-      }),
-    );
-    await landing.setNotifyValue(true);
-    await takeoff.setNotifyValue(true);
+    await event.setNotifyValue(true);
 
     if (battery != null) {
       _charSubs.add(
@@ -315,6 +304,38 @@ class BleSensor implements Sensor {
     );
   }
 
+  Future<List<int>?> _readJumpChar(String characteristic) async {
+    final c = _findChar(BleProtocol.jumpService, characteristic);
+    if (c == null) return null;
+    try {
+      return await c.read();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<SensorInfo?> readSensorInfo() async {
+    final v = await _readJumpChar(BleProtocol.infoCharacteristic);
+    return v == null ? null : BleProtocol.parseInfo(v);
+  }
+
+  @override
+  Future<AlgorithmMetadata> readAlgorithmMetadata() async {
+    Future<String?> readString(String characteristic) async {
+      final v = await _readJumpChar(characteristic);
+      return v == null ? null : BleProtocol.parseUtf8String(v);
+    }
+
+    return AlgorithmMetadata.parse(
+      fieldsJson: await readString(BleProtocol.fieldsCharacteristic),
+      reasonsJson: await readString(BleProtocol.reasonsCharacteristic),
+      confidenceKind: await readString(
+        BleProtocol.confidenceKindCharacteristic,
+      ),
+    );
+  }
+
   void _set(SensorConnectionState s) {
     if (_current == s || _state.isClosed) return;
     _current = s;
@@ -324,8 +345,7 @@ class BleSensor implements Sensor {
   @override
   Future<void> dispose() async {
     await disconnect();
-    await _landings.close();
-    await _takeoffs.close();
+    await _events.close();
     await _battery.close();
     await _state.close();
   }

@@ -13,8 +13,11 @@
 //  2. Decide from that data whether the gymnast just LANDED on the bed or TOOK OFF.
 //  3. Tell the firmware with  landing(s.timeUs)  or  takeoff(s.timeUs).
 //
-//  That is all. The firmware turns your calls into flight and contact times, counts the
-//  sequence numbers and sends the BLE notifications to the app.
+//  That is all. The firmware numbers the jumps and sends the BLE events to the app, which
+//  computes flight and contact times from them.
+//  Optional extras (see core/JumpDetector.h): a fast STAGE_PROVISIONAL report followed by a
+//  refined STAGE_FINAL one, retractTakeoff()/retractLanding(), confidence, reason bits and
+//  custom fields described by fieldsJson()/reasonsJson()/confidenceKind().
 //  Set DEMO_MODE 0 (FirmwareConfig.h, default) so the IMU is used, and IMU_SERIAL_LOG 1 to
 //  watch the raw data.
 //
@@ -24,7 +27,7 @@
 // Rules of the game
 //  - Report events in order: takeoff, landing, takeoff, landing, ...
 //    (A landing without an earlier takeoff, and a takeoff while already airborne, are
-//     ignored by the firmware, so it is fine to start "in the middle".)
+//     ignored and logged by the firmware, so it is fine to start "in the middle".)
 //  - Flight time = landing time - takeoff time; contact time = takeoff time - previous landing.
 //    The precision of those times is the precision of the timestamps you pass in.
 //  - onSample() runs ~416 or ~833 times per second. Keep it fast: no delay(), no

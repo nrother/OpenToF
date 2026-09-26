@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/sensor/sensor.dart';
+import '../domain/algorithm_metadata.dart';
 import '../domain/battery_estimator.dart';
 import '../domain/chart_event.dart';
 import '../domain/jump.dart';
@@ -23,6 +24,8 @@ class SessionState {
     this.deviceInfo,
     this.events = const [],
     this.chartFrozenAt,
+    this.algorithm = AlgorithmMetadata.none,
+    this.sensorInfo,
   });
 
   final SensorConnectionState connection;
@@ -45,11 +48,19 @@ class SessionState {
   /// Non-null while the chart view is paused: the time its window ends at.
   final DateTime? chartFrozenAt;
 
+  /// What the sensor's algorithm reports per event (re-read on connect).
+  final AlgorithmMetadata algorithm;
+
+  /// Protocol version and boot counter (re-read on connect); null until read
+  /// or if the sensor doesn't expose it.
+  final SensorInfo? sensorInfo;
+
   SessionState copyWith({
     SensorConnectionState? connection,
     int? batteryLevel,
     Duration? batteryRemaining,
     Jump? lastJump,
+    bool clearLastJump = false,
     List<Jump>? history,
     RoutineState? routine,
     String? deviceName,
@@ -57,11 +68,13 @@ class SessionState {
     List<ChartEvent>? events,
     DateTime? chartFrozenAt,
     bool clearChartFrozen = false,
+    AlgorithmMetadata? algorithm,
+    SensorInfo? sensorInfo,
   }) => SessionState(
     connection: connection ?? this.connection,
     batteryLevel: batteryLevel ?? this.batteryLevel,
     batteryRemaining: batteryRemaining ?? this.batteryRemaining,
-    lastJump: lastJump ?? this.lastJump,
+    lastJump: clearLastJump ? null : (lastJump ?? this.lastJump),
     history: history ?? this.history,
     routine: routine ?? this.routine,
     deviceName: deviceName ?? this.deviceName,
@@ -70,6 +83,8 @@ class SessionState {
     chartFrozenAt: clearChartFrozen
         ? null
         : (chartFrozenAt ?? this.chartFrozenAt),
+    algorithm: algorithm ?? this.algorithm,
+    sensorInfo: sensorInfo ?? this.sensorInfo,
   );
 }
 
@@ -88,6 +103,10 @@ class SessionController extends Notifier<SessionState> {
   BatteryEstimator _battery = BatteryEstimator();
   Timer? _timer;
   bool _wasConnected = false;
+  int? _bootCount;
+
+  /// Serials of jumps dropped as implausible; their later updates are ignored.
+  final Set<int> _filtered = {};
   final List<StreamSubscription<dynamic>> _subs = [];
 
   @override
@@ -102,6 +121,8 @@ class SessionController extends Notifier<SessionState> {
     _machine = RoutineMachine();
     _battery = BatteryEstimator();
     _wasConnected = false;
+    _bootCount = null;
+    _filtered.clear();
     _timer = Timer.periodic(_tickInterval, (_) => _tick());
     ref.onDispose(_teardown);
 
@@ -117,8 +138,7 @@ class SessionController extends Notifier<SessionState> {
     _sensor = sensor;
     _subs
       ..add(sensor.connectionState.listen(_onConnection))
-      ..add(sensor.takeoffs.listen(_assembler.onTakeoff))
-      ..add(sensor.landings.listen(_onLanding))
+      ..add(sensor.events.listen(_onSensorEvent))
       ..add(sensor.batteryLevel.listen(_onBattery));
     unawaited(sensor.connect().catchError((Object _) {}));
   }
@@ -153,6 +173,7 @@ class SessionController extends Notifier<SessionState> {
     if (c == SensorConnectionState.connected) {
       unawaited(_refreshName());
       unawaited(_refreshDeviceInfo());
+      unawaited(_refreshAlgorithm());
     }
   }
 
@@ -170,13 +191,14 @@ class SessionController extends Notifier<SessionState> {
     if (c != SensorConnectionState.connecting) {
       _wasConnected = c == SensorConnectionState.connected;
     }
-    if (type == null) return null;
-    final at = _now();
-    return [
-      ...state.events.where((e) => e.at.isAfter(_cutoff(at))),
-      ChartEvent(at: at, type: type),
-    ];
+    return type == null ? null : _appendEvent(type, _now());
   }
+
+  /// Appends a chart event, pruned to the same retention window as [history].
+  List<ChartEvent> _appendEvent(ChartEventType type, DateTime at) => [
+    ...state.events.where((e) => e.at.isAfter(_cutoff(at))),
+    ChartEvent(at: at, type: type),
+  ];
 
   /// Oldest time still kept for the chart. While the view is paused, data
   /// around the frozen window must survive, so it is measured from there.
@@ -208,9 +230,48 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
-  void _onLanding(LandingEvent landing) {
-    final jump = _assembler.onLanding(landing);
-    if (jump == null) return;
+  /// A changed boot counter means the device clock and jump ids restarted.
+  Future<void> _refreshAlgorithm() async {
+    final sensor = _sensor;
+    if (sensor == null) return;
+    final info = await sensor.readSensorInfo();
+    if (!ref.mounted) return;
+    if (info != null) {
+      if (_bootCount != null && info.bootCount != _bootCount) {
+        _assembler.reset();
+      }
+      _bootCount = info.bootCount;
+    }
+    final algorithm = await sensor.readAlgorithmMetadata();
+    if (!ref.mounted) return;
+    _assembler.metadata = algorithm;
+    state = state.copyWith(algorithm: algorithm, sensorInfo: info);
+  }
+
+  void _onSensorEvent(JumpEvent e) {
+    switch (_assembler.onEvent(e)) {
+      case null:
+        return;
+      case JumpAdded(:final jump):
+        _onNewJump(jump);
+      case JumpChanged(:final jump):
+        _onJumpChanged(jump);
+      case JumpRemoved(:final serial):
+        _onJumpRemoved(serial);
+    }
+  }
+
+  void _onNewJump(Jump jump) {
+    if (jump.isImplausible) {
+      _filtered.add(jump.serial);
+      // Almost certainly a sensor glitch (docs/DECISIONS.md): excluded from
+      // the routine, the last-jump display, history and CSV, but left as a
+      // marker on the chart so it's visible while debugging the firmware.
+      state = state.copyWith(
+        events: _appendEvent(ChartEventType.implausibleJump, jump.landedAt),
+      );
+      return;
+    }
 
     final before = _machine.state;
     _machine.onJump(jump);
@@ -221,16 +282,61 @@ class SessionController extends Notifier<SessionState> {
       ...state.history.where((j) => j.landedAt.isAfter(cutoff)),
       jump,
     ];
+    var events = state.events.where((e) => e.at.isAfter(cutoff)).toList();
+    if (before.phase == RoutinePhase.running &&
+        after.phase == RoutinePhase.complete) {
+      events = [
+        ...events,
+        ChartEvent(at: jump.landedAt, type: ChartEventType.routineStopped),
+      ];
+    }
     state = state.copyWith(
       lastJump: jump,
       history: history,
-      events: state.events.where((e) => e.at.isAfter(cutoff)).toList(),
+      events: events,
       routine: after,
     );
 
     if (after.jumps.length > before.jumps.length) {
       _playFor(after.jumps.length, after.targetJumps);
     }
+  }
+
+  /// A final estimate replaced a provisional one: update the jump wherever it
+  /// is shown. Beeps and routine counting already happened with the
+  /// provisional landing.
+  void _onJumpChanged(Jump jump) {
+    if (_filtered.contains(jump.serial)) return;
+    if (jump.isImplausible) {
+      _onJumpRemoved(jump.serial);
+      _filtered.add(jump.serial);
+      state = state.copyWith(
+        events: _appendEvent(ChartEventType.implausibleJump, jump.landedAt),
+      );
+      return;
+    }
+    _machine.replaceJump(jump);
+    state = state.copyWith(
+      lastJump: state.lastJump?.serial == jump.serial ? jump : null,
+      history: [
+        for (final j in state.history) j.serial == jump.serial ? jump : j,
+      ],
+      routine: _machine.state,
+    );
+  }
+
+  /// The sensor retracted a landing: the jump did not happen.
+  void _onJumpRemoved(int serial) {
+    if (_filtered.remove(serial)) return;
+    _machine.removeJump(serial);
+    final history = state.history.where((j) => j.serial != serial).toList();
+    final wasLast = state.lastJump?.serial == serial;
+    state = state.copyWith(
+      history: history,
+      lastJump: wasLast && history.isNotEmpty ? history.last : null,
+      clearLastJump: wasLast && history.isEmpty,
+      routine: _machine.state,
+    );
   }
 
   void _onBattery(int level) {
@@ -258,9 +364,15 @@ class SessionController extends Notifier<SessionState> {
   // ---- routine ----
 
   void _tick() {
+    final wasRunning = _machine.state.phase == RoutinePhase.running;
     _machine.tick(_now());
     if (!identical(_machine.state, state.routine)) {
       state = state.copyWith(routine: _machine.state);
+      if (wasRunning && _machine.state.phase == RoutinePhase.cancelled) {
+        state = state.copyWith(
+          events: _appendEvent(ChartEventType.routineStopped, _now()),
+        );
+      }
     }
   }
 
@@ -273,15 +385,31 @@ class SessionController extends Notifier<SessionState> {
       jumpsPerRoutine: settings.jumpsPerRoutine,
     );
     if (started) {
-      state = state.copyWith(routine: _machine.state);
+      final at = _now();
+      state = state.copyWith(
+        routine: _machine.state,
+        events: _appendEvent(ChartEventType.routineStarted, at),
+      );
+      if (_machine.state.phase != RoutinePhase.running) {
+        // E.g. a 1-jump routine completes immediately at Start.
+        state = state.copyWith(
+          events: _appendEvent(ChartEventType.routineStopped, at),
+        );
+      }
       _playFor(1, _machine.state.targetJumps);
     }
     return started;
   }
 
   void cancelRoutine() {
+    final wasRunning = _machine.state.phase == RoutinePhase.running;
     _machine.cancel();
     state = state.copyWith(routine: _machine.state);
+    if (wasRunning && _machine.state.phase == RoutinePhase.cancelled) {
+      state = state.copyWith(
+        events: _appendEvent(ChartEventType.routineStopped, _now()),
+      );
+    }
   }
 
   void clearHistory() =>

@@ -25,10 +25,11 @@
  *     ImuTypes.h, Transition.h   data types
  *     ImuSource.h           reads the IMU and feeds the detector
  *     DemoSource.h          simulated jumps (DEMO_MODE 1)
- *     JumpEventPublisher.h  transitions -> flight/contact time events
+ *     JumpEventPublisher.h  takeoff/landing reports -> BLE events (jump ids, stage rules)
  *     BleService.h          BLE GATT server (jump, battery and device information services)
  *     BatteryMonitor.h      battery measurement
  *     DeviceName.h          device name in flash + validation
+ *     BootCounter.h         boot counter in flash (lets the app notice a restarted clock)
  *     Logging.h, Micros64.h helpers
  *
  * Includes are relative to the including file: this .ino uses "core/Logging.h", headers use
@@ -57,13 +58,17 @@
 // #include "algorithms/AzPipelineJumpDetector.h"
 // typedef AzPipelineJumpDetector ActiveJumpDetector;
 
-#include "algorithms/AzPipelineBufferedJumpDetector.h"
-typedef AzPipelineBufferedJumpDetector ActiveJumpDetector;
+// #include "algorithms/AzPipelineBufferedJumpDetector.h"
+// typedef AzPipelineBufferedJumpDetector ActiveJumpDetector;
+
+#include "algorithms/BedCycleJumpDetector.h"
+typedef BedCycleJumpDetector ActiveJumpDetector;
 
 
 #include "config/FirmwareConfig.h"
 #include "core/BatteryMonitor.h"
 #include "core/BleService.h"
+#include "core/BootCounter.h"
 #include "core/DemoSource.h"
 #include "core/DeviceName.h"
 #include "core/ImuSource.h"
@@ -103,25 +108,25 @@ void setup() {
   digitalWrite(RF_SWITCH_PIN, LOW);
 
 #if DEMO_MODE
-  const char* algorithmName = demoSource.name();
+  source = &demoSource;
 #else
-  const char* algorithmName = detector.name();
+  source = &imuSource;
 #endif
-  LOG(String("Algorithm: ") + algorithmName);
+  LOG(String("Algorithm: ") + source->name());
 
   loadDeviceName();
-  if (!bleBegin(algorithmName)) fatalBlink("BLE init failed");
+  incrementBootCount();
+  LOG(String("Boot #") + bootCount);
+  if (!bleBegin(*source)) fatalBlink("BLE init failed");
 
   if (battery.update(true)) bleSetBatteryLevel(battery.percent());
 
 #if DEMO_MODE
   LOG("DEMO MODE: simulated jumps, IMU not used");
   demoSource.begin();
-  source = &demoSource;
 #else
   if (!imuSource.begin()) fatalBlink("IMU init failed");
   LOG(String("IMU profile: ") + imuSource.profile().name);
-  source = &imuSource;
 #endif
 
   bleStartAdvertising();

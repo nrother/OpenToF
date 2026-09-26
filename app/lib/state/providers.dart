@@ -60,6 +60,17 @@ class SettingsNotifier extends Notifier<AppSettings> {
   );
   void setUseMockSensor(bool v) => _set(state.copyWith(useMockSensor: v));
   void setThemeMode(AppThemeMode v) => _set(state.copyWith(themeMode: v));
+  void setShowContactTime(bool v) => _set(state.copyWith(showContactTime: v));
+  void setShowTotalTime(bool v) => _set(state.copyWith(showTotalTime: v));
+  void setShowJumpDetails(bool v) => _set(state.copyWith(showJumpDetails: v));
+  void setDetailVisible(String key, bool visible) => _set(
+    state.copyWith(
+      hiddenDetails: [
+        ...state.hiddenDetails.where((k) => k != key),
+        if (!visible) key,
+      ],
+    ),
+  );
 
   void pair(String id, String? name) => _set(state.withPaired(id, name));
   void unpair() => _set(state.withPaired(null, null));

@@ -5,6 +5,7 @@ import 'package:opentof_app/app.dart';
 import 'package:opentof_app/data/audio_service.dart';
 import 'package:opentof_app/data/export_service.dart';
 import 'package:opentof_app/data/sensor/mock_sensor.dart';
+import 'package:opentof_app/domain/jump.dart';
 import 'package:opentof_app/domain/routine.dart';
 import 'package:opentof_app/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,10 +24,15 @@ class FakeAudio implements AudioService {
 
 class FakeExport implements ExportService {
   final List<RoutineState> shared = [];
+  final List<List<Jump>> sharedJumps = [];
 
   @override
   Future<void> shareRoutine(RoutineState routine, {DateTime? now}) async =>
       shared.add(routine);
+
+  @override
+  Future<void> shareJumps(List<Jump> jumps, {DateTime? now}) async =>
+      sharedJumps.add(jumps);
 }
 
 /// Running app wired to a MockSensor, a manually advanced clock and fakes.
@@ -70,6 +76,7 @@ class AppHarness {
     WidgetTester tester, {
     Map<String, Object> prefs = const {},
     bool paired = true,
+    String appVersion = '0.4.3 (4)', // same MAJOR.MINOR as the mock firmware
   }) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;
@@ -90,7 +97,7 @@ class AppHarness {
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(sp),
-          appVersionProvider.overrideWithValue('1.2.3 (4)'),
+          appVersionProvider.overrideWithValue(appVersion),
           exitAppProvider.overrideWithValue(() async => exits.count++),
           clockProvider.overrideWithValue(() => clock.now),
           audioServiceProvider.overrideWithValue(audio),

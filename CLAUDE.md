@@ -31,8 +31,13 @@ repo, for every agent session, no exceptions.
   **minor**, or **hotfix/patch** bump, and bump the corresponding version as part of that same commit:
   - Flutter app: `version:` in `app/pubspec.yaml` (`MAJOR.MINOR.PATCH+BUILD`; bump the build number too).
   - Main firmware: `FIRMWARE_VERSION` in `firmware/OpenToF_Firmware/config/FirmwareConfig.h`.
-  - A commit touching both bumps both, independently (they don't have to move in lockstep) — ask separately for each.
+  - **App and firmware share MAJOR.MINOR** (decided 2026-09-26; aligned at 0.4.0). A major or minor bump of either
+    one bumps the other to the same MAJOR.MINOR (with PATCH reset to 0), even if the other's code didn't change.
+    Hotfix/patch bumps are independent: only the part that changed gets a new PATCH.
+  - A commit touching both: ask once for major/minor (applies to both); for a hotfix, bump each changed part's PATCH.
   - Docs-only, helper-script-only, or tooling-only commits don't need a version bump; still ask before committing.
+  - Every version bump also adds its entry to `Changelog.md` (root), written for readers who haven't read
+    `docs/DECISIONS.md`: what changed for users/algorithm authors, not why.
 
 ## Restructuring note (2026-09-23)
 `app/`, `docs/` staying at root, and the CLAUDE.md split into this file + `app/CLAUDE.md` + `firmware/CLAUDE.md`,

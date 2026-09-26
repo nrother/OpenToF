@@ -22,6 +22,24 @@ class JumpDetector {
     return IMU_USE_HIGH_RATE_PROFILE ? PROFILE_833HZ_16G : PROFILE_416HZ_8G;
   }
 
+  // ---- OPTIONAL description of what your events carry (each string at most 512 bytes) ----
+  // Each is published in its own read-only BLE characteristic; the app reads them on connect.
+  //
+  // JSON array, one object per custom field in EventInfo::extras, in packing order:
+  //   [{"id":"li","name":"Landing intensity","t":"u8","on":"L","rel":true,"na":255}]
+  //   required: id (short stable key), name (English), t (u8|i8|u16|i16|u32|i32),
+  //             on ("T" = takeoff events, "L" = landing events, "TL" = both)
+  //   optional: desc, unit, scale (shown value = raw * scale), rel (only relative), na (raw
+  //             value meaning "not available")
+  // A takeoff event carries exactly the fields whose "on" contains T, a landing event those
+  // with L, at most EVENT_EXTRAS_MAX bytes per event kind.
+  virtual const char* fieldsJson() const { return "[]"; }
+  // JSON array of up to 8 short English strings; entry i names bit i of EventInfo::reasons.
+  virtual const char* reasonsJson() const { return "[]"; }
+  // "none" (never sets confidence), "heuristic" (higher = better) or "calibrated"
+  // (confidence N = N % of such events are right).
+  virtual const char* confidenceKind() const { return "none"; }
+
   // Called once at start-up, after the IMU is running. Reset your state here.
   virtual void begin() {}
 
@@ -38,12 +56,26 @@ class JumpDetector {
   }
 
  protected:
-  // Call when the gymnast LEAVES the bed. `timeUs` normally is s.timeUs of the current sample;
-  // if your detector notices it late you may pass an earlier time (e.g. s.timeUs - delayUs).
-  void takeoff(uint64_t timeUs) { push(TRANSITION_TAKEOFF, timeUs); }
+  // Call when the gymnast LEAVES the bed / LANDS on the bed. `timeUs` is when it physically
+  // happened on the s.timeUs clock: backdate it if you notice late (e.g. s.timeUs - delayUs),
+  // or put it slightly ahead for a predicted takeoff.
+  // Simple form: one final event without confidence or custom fields.
+  void takeoff(uint64_t timeUs) { push(TRANSITION_TAKEOFF, STAGE_FINAL, false, timeUs, EventInfo()); }
+  void landing(uint64_t timeUs) { push(TRANSITION_LANDING, STAGE_FINAL, false, timeUs, EventInfo()); }
 
-  // Call when the gymnast LANDS on the bed. Same rules for `timeUs`.
-  void landing(uint64_t timeUs) { push(TRANSITION_LANDING, timeUs); }
+  // Full form. Report a fast STAGE_PROVISIONAL estimate first and a refined STAGE_FINAL one
+  // later (at most ~200 ms after the event); either stage alone is fine too.
+  void takeoff(uint64_t timeUs, EventStage stage, const EventInfo& info = EventInfo()) {
+    push(TRANSITION_TAKEOFF, stage, false, timeUs, info);
+  }
+  void landing(uint64_t timeUs, EventStage stage, const EventInfo& info = EventInfo()) {
+    push(TRANSITION_LANDING, stage, false, timeUs, info);
+  }
+
+  // Withdraw the current provisional takeoff (voids the whole jump) or landing (back in the
+  // air; a new landing may follow). Only valid while that event has no final yet.
+  void retractTakeoff() { push(TRANSITION_TAKEOFF, STAGE_PROVISIONAL, true, 0, EventInfo()); }
+  void retractLanding() { push(TRANSITION_LANDING, STAGE_PROVISIONAL, true, 0, EventInfo()); }
 
  private:
   static const int QUEUE_SIZE = 8;
@@ -51,9 +83,15 @@ class JumpDetector {
   int _head = 0;
   int _count = 0;
 
-  void push(TransitionType type, uint64_t timeUs) {
+  void push(TransitionType type, EventStage stage, bool retract, uint64_t timeUs,
+            const EventInfo& info) {
     if (_count >= QUEUE_SIZE) return;  // cannot happen if the firmware keeps up
-    _queue[(_head + _count) % QUEUE_SIZE] = {type, timeUs};
+    Transition& t = _queue[(_head + _count) % QUEUE_SIZE];
+    t.type = type;
+    t.stage = stage;
+    t.retract = retract;
+    t.timeUs = timeUs;
+    t.info = info;
     _count++;
   }
 };

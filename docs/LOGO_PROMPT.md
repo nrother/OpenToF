@@ -1,5 +1,8 @@
 # Prompts for NEW OpenToF logo designs (image generation app)
 
+> **Done (2026-09-26):** the new logo and wordmark are in `img/` (see `docs/DECISIONS.md`, Branding). This file is
+> kept as history; the files it names (`OpenToF_logo.png`, `app_icon2.png`) have been removed.
+
 Goal: explore fresh logo concepts, not redraw the current one (`app/assets/images/OpenToF_logo.png`: trampoline with
 sensor box, blue ball, dotted arcs, "OpenToF" wordmark plus subtitle). The old one is only a reference for what the
 product is; do not reuse its composition.

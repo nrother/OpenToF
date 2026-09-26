@@ -5,7 +5,8 @@ overall layout and repo-wide working rules). The companion app lives in `../app/
 
 **Git: never `git push`; ask the user before every commit or branch change; ask major/minor/hotfix and bump
 `FIRMWARE_VERSION` in `OpenToF_Firmware/config/FirmwareConfig.h` on a commit that changes `OpenToF_Firmware/`
-(not the helper sketches below). Full policy in the repo root `CLAUDE.md`.**
+(not the helper sketches below); major/minor also bumps the app to the same MAJOR.MINOR. Full policy in the repo
+root `CLAUDE.md`.**
 
 `OpenToF_Firmware/` (Arduino, XIAO MG24 Sense; user writes `MyJumpDetector.h`). Simulated jumps for testing
 the app without real detection are `DEMO_MODE 1` in `config/FirmwareConfig.h`, not a separate sketch (a former

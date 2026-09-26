@@ -61,6 +61,11 @@ class ImuSource : public TransitionSource {
 
   const ImuProfile& profile() const { return *_profile; }
 
+  const char* name() const override { return _detector.name(); }
+  const char* fieldsJson() const override { return _detector.fieldsJson(); }
+  const char* reasonsJson() const override { return _detector.reasonsJson(); }
+  const char* confidenceKind() const override { return _detector.confidenceKind(); }
+
   bool poll(Transition& out) override {
 #if DEBUG_SERIAL
     heartbeat();

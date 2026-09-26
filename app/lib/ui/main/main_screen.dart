@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/settings_repository.dart';
 import '../../domain/chart_event.dart';
 import '../../domain/jump.dart';
 import '../../domain/routine.dart';
@@ -10,6 +11,7 @@ import '../brand_logo.dart';
 import '../format.dart';
 import '../settings/settings_screen.dart';
 import 'jump_chart.dart';
+import 'jump_details.dart';
 import 'routine_panel.dart';
 import 'status_indicators.dart';
 
@@ -22,7 +24,20 @@ class MainScreen extends ConsumerWidget {
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
     final battery = ref.watch(sessionProvider.select((s) => s.batteryLevel));
     final routine = ref.watch(sessionProvider.select((s) => s.routine));
+    final hasHistory = ref.watch(
+      sessionProvider.select((s) => s.history.isNotEmpty),
+    );
     final paired = ref.watch(settingsProvider.select((s) => s.isPaired));
+    final showContact = ref.watch(
+      settingsProvider.select((s) => s.showContactTime),
+    );
+    final showTotal = ref.watch(
+      settingsProvider.select((s) => s.showTotalTime),
+    );
+    final settings = ref.watch(settingsProvider);
+    final detailsOn = settings.showJumpDetails;
+    final algorithm = ref.watch(sessionProvider.select((s) => s.algorithm));
+    final details = visibleDetails(context, l, algorithm, settings);
 
     return Scaffold(
       appBar: AppBar(
@@ -34,11 +49,11 @@ class MainScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          if (routine.exportable)
+          if (routine.exportable || hasHistory)
             IconButton(
               icon: const Icon(Icons.ios_share, size: 20),
               tooltip: l.exportTooltip,
-              onPressed: () => _export(context, ref, routine),
+              onPressed: () => _chooseExport(context, ref),
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -65,7 +80,15 @@ class MainScreen extends ConsumerWidget {
             const _RoutineActions(),
             if (routine.phase != RoutinePhase.idle) ...[
               const SizedBox(height: 12),
-              RoutinePanel(routine: routine),
+              RoutinePanel(
+                routine: routine,
+                showContact: showContact,
+                showTotal: showTotal,
+                details: details,
+                onJumpTap: detailsOn
+                    ? (j) => showJumpDetailsSheet(context, j, algorithm)
+                    : null,
+              ),
             ],
             const SizedBox(height: 12),
             const _ChartCard(),
@@ -78,15 +101,67 @@ class MainScreen extends ConsumerWidget {
   void _openSettings(BuildContext context) => Navigator.of(context)
       .push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
 
-  Future<void> _export(
-    BuildContext context,
-    WidgetRef ref,
-    RoutineState routine,
-  ) async {
+  /// Lets the user export either the recorded routine or all jumps of the
+  /// last 30 s / 1 min / 5 min (the chart's window options).
+  Future<void> _chooseExport(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final l = AppLocalizations.of(context);
+    final session = ref.read(sessionProvider);
+    final now = ref.read(clockProvider)();
+    final routine = session.routine;
+    List<Jump> lastSeconds(int seconds) {
+      final from = now.subtract(Duration(seconds: seconds));
+      return [
+        for (final j in session.history)
+          if (j.landedAt.isAfter(from)) j,
+      ];
+    }
+
+    final windowLabels = {30: l.window30s, 60: l.window1m, 300: l.window5m};
+    final export = ref.read(exportServiceProvider);
+    final action = await showModalBottomSheet<Future<void> Function()>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                l.exportChooserTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.format_list_numbered),
+              title: Text(l.exportRoutine),
+              subtitle: Text(l.jumpCount(routine.jumps.length)),
+              enabled: routine.exportable,
+              onTap: () =>
+                  Navigator.pop(context, () => export.shareRoutine(routine)),
+            ),
+            for (final seconds in AppSettings.windowOptionsSeconds)
+              Builder(
+                builder: (context) {
+                  final jumps = lastSeconds(seconds);
+                  return ListTile(
+                    leading: const Icon(Icons.history),
+                    title: Text(l.exportLastWindow(windowLabels[seconds]!)),
+                    subtitle: Text(l.jumpCount(jumps.length)),
+                    enabled: jumps.isNotEmpty,
+                    onTap: () =>
+                        Navigator.pop(context, () => export.shareJumps(jumps)),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+    if (action == null) return;
     try {
-      await ref.read(exportServiceProvider).shareRoutine(routine);
+      await action();
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(l.exportFailed('$e'))));
     }
@@ -118,43 +193,90 @@ class _LastJumpCard extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final Jump? jump = ref.watch(sessionProvider.select((s) => s.lastJump));
+    final showContact = ref.watch(
+      settingsProvider.select((s) => s.showContactTime),
+    );
+    final showTotal = ref.watch(
+      settingsProvider.select((s) => s.showTotalTime),
+    );
+    String secondsOrDash(double? v) =>
+        v == null ? '–' : l.seconds(formatSecondsValue(context, v));
+    final times = [
+      if (showContact && jump != null)
+        '${l.contactLabel}: ${secondsOrDash(jump.contactSeconds)}',
+      if (showTotal && jump != null)
+        '${l.totalTimeLabel}: ${secondsOrDash(jump.totalSeconds)}',
+    ];
+    final settings = ref.watch(settingsProvider);
+    final algorithm = ref.watch(sessionProvider.select((s) => s.algorithm));
+    final detailLine = jump == null
+        ? ''
+        : [
+            for (final d in visibleDetails(context, l, algorithm, settings))
+              d.describe(jump),
+          ].nonNulls.join(' · ');
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          children: [
-            Text(l.lastJump, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                jump == null
-                    ? l.noJumpYet
-                    : l.seconds(
-                        formatSecondsValue(context, jump.flightSeconds),
-                      ),
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: settings.showJumpDetails && jump != null
+            ? () => showJumpDetailsSheet(context, jump, algorithm)
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            children: [
+              Text(l.lastJump, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  jump == null
+                      ? l.noJumpYet
+                      : l.seconds(
+                          formatSecondsValue(context, jump.flightSeconds),
+                        ),
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
-            ),
-            if (jump != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${l.heightLabel}: ${l.meters(formatMetersValue(context, jump.heightMeters))}',
-                    style: theme.textTheme.bodyLarge,
+              if (times.isNotEmpty)
+                Text(
+                  times.join('   '),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
-                  const SizedBox(width: 6),
-                  const BetaTag(),
-                ],
-              ),
+                ),
+              if (jump != null) ...[
+                const SizedBox(height: 4),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  children: [
+                    Text(
+                      '${l.heightLabel}: ${l.meters(formatMetersValue(context, jump.heightMeters))}',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const BetaTag(),
+                  ],
+                ),
+              ],
+              if (detailLine.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    detailLine,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -283,6 +405,16 @@ class _ChartCard extends ConsumerWidget {
                   startLabel: l.chartSecondsAgo(window.inSeconds),
                   midLabel: l.chartSecondsAgo(window.inSeconds ~/ 2),
                   nowLabel: frozenAt == null ? l.chartNow : l.chartPaused,
+                  onJumpTap:
+                      ref.watch(
+                        settingsProvider.select((s) => s.showJumpDetails),
+                      )
+                      ? (j) => showJumpDetailsSheet(
+                          context,
+                          j,
+                          ref.read(sessionProvider).algorithm,
+                        )
+                      : null,
                 ),
                 if (empty)
                   Text(
@@ -307,15 +439,11 @@ class _ChartCard extends ConsumerWidget {
                             Icon(
                               chartEventIcon(t),
                               size: 14,
-                              color: t == ChartEventType.connected
-                                  ? connectedEventColor
-                                  : scheme.error,
+                              color: chartEventColor(t, scheme),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              t == ChartEventType.connected
-                                  ? l.connectionConnected
-                                  : l.connectionDisconnected,
+                              _eventLabel(l, t),
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                           ],
@@ -329,3 +457,11 @@ class _ChartCard extends ConsumerWidget {
     );
   }
 }
+
+String _eventLabel(AppLocalizations l, ChartEventType t) => switch (t) {
+  ChartEventType.connected => l.connectionConnected,
+  ChartEventType.disconnected => l.connectionDisconnected,
+  ChartEventType.routineStarted => l.chartRoutineStarted,
+  ChartEventType.routineStopped => l.chartRoutineStopped,
+  ChartEventType.implausibleJump => l.chartImplausibleJump,
+};

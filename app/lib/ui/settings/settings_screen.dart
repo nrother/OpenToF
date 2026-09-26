@@ -10,7 +10,8 @@ import '../../data/settings_repository.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../brand_logo.dart';
-import '../format.dart';
+import '../main/jump_details.dart';
+import 'sensor_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -101,6 +102,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (ok == true) await exit();
   }
 
+  void _openSensor() =>
+      Navigator.of(context)
+          .push(MaterialPageRoute<void>(builder: (_) => const SensorScreen()));
+
   void _unpair() {
     ref.read(settingsProvider.notifier).unpair();
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -119,10 +124,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           children: [
             const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: Center(child: BrandLogo(height: 120)),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: BrandLogo(height: 64),
+                ),
+              ),
             ),
-            _Section(l.sensorSection),
+            SettingsSection(l.sensorSection),
             if (settings.isPaired) ...[
               ListTile(
                 leading: const Icon(Icons.sensors),
@@ -132,15 +142,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       l.unnamedSensor,
                 ),
                 subtitle: Text(_connectionText(l, session.connection)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: l.renameSensor,
-                  onPressed:
-                      session.connection == SensorConnectionState.connected
-                      ? _rename
-                      : null,
+                onTap: _openSensor,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      tooltip: l.renameSensor,
+                      onPressed:
+                          session.connection == SensorConnectionState.connected
+                          ? _rename
+                          : null,
+                    ),
+                    Icon(Icons.chevron_right, semanticLabel: l.sensorDetails),
+                  ],
                 ),
               ),
+              const VersionMismatchWarning(),
               ListTile(
                 leading: const Icon(Icons.link_off),
                 title: Text(l.unpairSensor),
@@ -188,44 +206,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     : () => notifier.pair(d.id, d.name.isEmpty ? null : d.name),
               ),
 
-            if (settings.isPaired) ...[
-              _Section(l.batterySection),
-              ListTile(
-                title: Text(l.batteryLevelLabel),
-                trailing: Text(
-                  session.batteryLevel == null
-                      ? '–'
-                      : l.percent(session.batteryLevel!),
-                ),
-              ),
-              ListTile(
-                title: Text(l.batteryRemaining),
-                trailing: Text(
-                  session.batteryRemaining == null
-                      ? l.batteryRemainingUnknown
-                      : formatRemaining(l, session.batteryRemaining!),
-                ),
-              ),
-
-              _Section(l.deviceInfoSection),
-              _infoRow(
-                l.manufacturerLabel,
-                session.deviceInfo?.manufacturerName,
-              ),
-              _infoRow(l.modelLabel, session.deviceInfo?.modelNumber),
-              _infoRow(l.serialNumberLabel, session.deviceInfo?.serialNumber),
-              _infoRow(
-                l.hardwareRevisionLabel,
-                session.deviceInfo?.hardwareRevision,
-              ),
-              _infoRow(
-                l.firmwareRevisionLabel,
-                session.deviceInfo?.firmwareRevision,
-              ),
-              _infoRow(l.algorithmLabel, session.deviceInfo?.softwareRevision),
-            ],
-
-            _Section(l.routineSection),
+            SettingsSection(l.routineSection),
             ListTile(
               title: Text(l.inactivityTimeout),
               subtitle: Text(l.inactivityTimeoutHelp),
@@ -242,7 +223,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const _JumpCountField(),
 
-            _Section(l.feedbackSection),
+            SettingsSection(l.feedbackSection),
             SwitchListTile(
               title: Text(l.perJumpBeeps),
               subtitle: Text(l.perJumpBeepsHelp),
@@ -255,7 +236,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: notifier.setFinalBeep,
             ),
 
-            _Section(l.appearanceSection),
+            SettingsSection(l.appearanceSection),
             ListTile(
               title: Text(l.themeMode),
               trailing: SegmentedButton<AppThemeMode>(
@@ -279,7 +260,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
 
-            _Section(l.chartSection),
+            SettingsSection(l.displaySection),
+            SwitchListTile(
+              title: Text(l.showContactTime),
+              subtitle: Text(l.showContactTimeHelp),
+              value: settings.showContactTime,
+              onChanged: notifier.setShowContactTime,
+            ),
+            SwitchListTile(
+              title: Text(l.showTotalTime),
+              subtitle: Text(l.showTotalTimeHelp),
+              value: settings.showTotalTime,
+              onChanged: notifier.setShowTotalTime,
+            ),
+            SwitchListTile(
+              title: Text(l.showJumpDetails),
+              subtitle: Text(l.showJumpDetailsHelp),
+              value: settings.showJumpDetails,
+              onChanged: notifier.setShowJumpDetails,
+            ),
+            if (settings.showJumpDetails) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Text(
+                  l.detailsToShow,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              for (final d in availableDetails(context, l, session.algorithm))
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                  title: Text(d.header),
+                  subtitle: d.description == null ? null : Text(d.description!),
+                  value: !settings.hiddenDetails.contains(d.key),
+                  onChanged: (v) => notifier.setDetailVisible(d.key, v ?? true),
+                ),
+              if (availableDetails(context, l, session.algorithm).isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 4, 16, 8),
+                  child: Text(
+                    l.detailsNoSensorValues,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+
+            SettingsSection(l.chartSection),
             ListTile(
               title: Text(l.chartWindow),
               trailing: SegmentedButton<int>(
@@ -294,7 +321,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
 
-            _Section(l.aboutSection),
+            SettingsSection(l.aboutSection),
             ListTile(
               title: Text(l.appVersionLabel),
               trailing: Text(ref.watch(appVersionProvider)),
@@ -307,7 +334,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
 
             if (kDebugMode) ...[
-              _Section(l.debugSection),
+              SettingsSection(l.debugSection),
               SwitchListTile(
                 title: Text(l.useSimulatedSensor),
                 value: settings.useMockSensor,
@@ -321,21 +348,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
-  /// Read-only Device Information row; '–' while the value hasn't been read
-  /// yet (or the sensor doesn't expose it). The value is width-limited so a
-  /// long one (e.g. a serial number) can't push the row into overflow.
-  Widget _infoRow(String label, String? value) => ListTile(
-    title: Text(label),
-    trailing: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 180),
-      child: Text(
-        value ?? '–',
-        textAlign: TextAlign.end,
-        overflow: TextOverflow.ellipsis,
-      ),
-    ),
-  );
 
   String _connectionText(AppLocalizations l, SensorConnectionState c) =>
       switch (c) {
@@ -462,22 +474,6 @@ class _JumpCountFieldState extends ConsumerState<_JumpCountField> {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-    child: Text(
-      title,
-      style: Theme.of(context).textTheme.titleSmall
-          ?.copyWith(color: Theme.of(context).colorScheme.primary),
-    ),
-  );
-}
-
 class _SimulatorControls extends ConsumerWidget {
   const _SimulatorControls();
 
@@ -504,8 +500,8 @@ class _SimulatorControls extends ConsumerWidget {
             child: Text(l.simSingleJump),
           ),
           FilledButton.tonal(
-            onPressed: mock.dropNextLanding,
-            child: Text(l.simDropLanding),
+            onPressed: mock.dropNextJump,
+            child: Text(l.simDropJump),
           ),
           FilledButton.tonal(
             onPressed: mock.simulateDisconnect,

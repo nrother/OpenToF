@@ -19,12 +19,46 @@ void main() {
       final csv = CsvExporter.build(state).split('\r\n');
       expect(
         csv[0],
-        'jump,flight_time_s,contact_time_s,height_m_beta,missed_event',
+        'jump,flight_time_s,contact_time_s,total_time_s,height_m_beta,missed_event,'
+        'provisional,confidence,reasons',
       );
-      expect(csv[1], '1,1.200,0.200,1.766,0');
-      expect(csv[2], '2,1.500,,2.759,1');
-      expect(csv[3], 'total,2.700,,,1');
+      expect(csv[1], '1,1.200,0.200,1.400,1.766,0,0,,');
+      expect(csv[2], '2,1.500,,,2.759,1,0,,');
+      expect(csv[3], 'total,2.700,,,,1,,,');
       expect(csv[4], ''); // trailing CRLF
+    });
+
+    test('confidence, reasons and one column per custom field', () {
+      final state = RoutineState(
+        phase: RoutinePhase.complete,
+        jumps: [
+          Jump(
+            flightMs: 1200,
+            landedAt: t0,
+            confidence: 40,
+            reasons: const ['weak push', 'say "hi", twice'],
+            fields: const {'li': 143, 'pi': 0.25},
+          ),
+          Jump(
+            flightMs: 1000,
+            landedAt: t0,
+            isFinal: false,
+            fields: const {'li': 90},
+          ),
+        ],
+      );
+      final csv = CsvExporter.build(state).split('\r\n');
+      expect(
+        csv[0],
+        'jump,flight_time_s,contact_time_s,total_time_s,height_m_beta,missed_event,'
+        'provisional,confidence,reasons,li,pi',
+      );
+      expect(
+        csv[1],
+        '1,1.200,,,1.766,0,0,40,"weak push; say ""hi"", twice",143,0.250',
+      );
+      expect(csv[2], '2,1.000,,,1.226,0,1,,,90,');
+      expect(csv[3], 'total,2.200,,,,0,,,,,');
     });
 
     test('file name is timestamped', () {

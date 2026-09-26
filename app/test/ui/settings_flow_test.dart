@@ -17,12 +17,19 @@ Future<void> openSettings(AppHarness h) async {
   await settleRoute(h);
 }
 
+/// Settings, then the sensor details page (tap on the paired sensor).
+Future<void> openSensor(AppHarness h) async {
+  await openSettings(h);
+  await h.tester.tap(find.text('OpenToF-Mock'));
+  await settleRoute(h);
+}
+
 void main() {
   testWidgets('settings show the app version', (tester) async {
     final h = await AppHarness.launch(tester);
     await openSettings(h);
     expect(find.text('Version'), findsOneWidget);
-    expect(find.text('1.2.3 (4)'), findsOneWidget);
+    expect(find.text('0.4.3 (4)'), findsOneWidget);
   });
 
   testWidgets('back twice exits, a single back only shows a hint', (
@@ -198,31 +205,102 @@ void main() {
     );
   });
 
-  testWidgets('battery level and missing estimate show in settings', (
+  testWidgets('battery level and missing estimate show on the sensor page', (
     tester,
   ) async {
     final h = await AppHarness.launch(tester);
     h.mock.setBatteryLevel(72);
     await h.advance(const Duration(milliseconds: 100));
-    await openSettings(h);
+    await openSensor(h);
 
     expect(find.text('72 %'), findsOneWidget);
     expect(find.text('Not enough data yet'), findsOneWidget);
   });
 
-  testWidgets('device info section shows values read from the sensor', (
+  testWidgets('sensor page shows device info read from the sensor', (
     tester,
   ) async {
     final h = await AppHarness.launch(tester);
     await openSettings(h);
+    expect(find.text('Device info'), findsNothing); // moved to its own page
+    await tester.tap(find.text('OpenToF-Mock'));
+    await settleRoute(h);
 
     expect(find.text('Device info'), findsOneWidget);
     expect(find.text('OpenToF'), findsWidgets); // manufacturer (+ app title)
     expect(find.text('OpenToF Sensor (simulated)'), findsOneWidget);
     expect(find.text('MOCK-0001'), findsOneWidget);
     expect(find.text('0.1'), findsOneWidget);
-    expect(find.text('0.3.0'), findsOneWidget);
+    expect(find.text('0.4.0'), findsOneWidget);
     expect(find.text('MockJumpDetector'), findsOneWidget);
+  });
+
+  testWidgets('sensor page describes the algorithm\'s event data', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSensor(h);
+
+    expect(find.text('Protocol version'), findsOneWidget);
+    expect(find.text('Estimate (higher = more reliable)'), findsOneWidget);
+    expect(find.text('• mock: simulated uncertainty'), findsOneWidget);
+    expect(find.text('Push-off intensity'), findsOneWidget);
+    expect(find.text('at landing · relative values · li · u8'), findsOneWidget);
+  });
+
+  testWidgets('no warning while app and firmware share MAJOR.MINOR', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester); // app 0.4.3, firmware 0.4.0
+    await openSettings(h);
+    expect(find.text("Sensor firmware doesn't match this app"), findsNothing);
+  });
+
+  testWidgets('settings and the sensor page warn on a version mismatch', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester, appVersion: '0.5.0 (7)');
+    await openSettings(h);
+    expect(find.text("Sensor firmware doesn't match this app"), findsOneWidget);
+    expect(
+      find.textContaining('App 0.5.0, sensor firmware 0.4.0'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('OpenToF-Mock'));
+    await settleRoute(h);
+    expect(find.text("Sensor firmware doesn't match this app"), findsOneWidget);
+  });
+
+  testWidgets('more jump details: pick which sensor values show', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSettings(h);
+    expect(find.text('Values to show'), findsNothing);
+    await tester.tap(find.text('Show more jump details'));
+    await tester.pump();
+
+    expect(find.text('Values to show'), findsOneWidget);
+    expect(find.text('Confidence (%)'), findsOneWidget);
+    expect(find.text('Push-off intensity'), findsOneWidget);
+    expect(find.text('Landing intensity'), findsOneWidget);
+
+    await tester.tap(find.text('Landing intensity'));
+    await tester.pump();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('show_jump_details'), isTrue);
+    expect(prefs.getStringList('hidden_jump_details'), ['li']);
+  });
+
+  testWidgets('time on bed and total time toggles persist', (tester) async {
+    final h = await AppHarness.launch(tester);
+    await openSettings(h);
+    await tester.tap(find.text('Show time on bed'));
+    await tester.tap(find.text('Show total jump time'));
+    await tester.pump();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('show_contact_time'), isTrue);
+    expect(prefs.getBool('show_total_time'), isTrue);
   });
 
   testWidgets('device info section is hidden while no sensor is paired', (

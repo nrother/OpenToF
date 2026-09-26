@@ -6,5 +6,5 @@ The firmware is build using the Arduino IDE.
 
 Short version:
 - Arduino-Board URL: https://siliconlabs.github.io/arduino/package_arduinosilabs_index.json 
-- Protocol Stack "BLE (SiLabs)"
+- Protocol Stack "BLE (Arduino)" (not "BLE (Silabs)")
 - SeedStdio LSM6DS3 library

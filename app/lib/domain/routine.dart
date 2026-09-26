@@ -114,6 +114,28 @@ class RoutineMachine {
     }
   }
 
+  /// Replaces a jump (same [Jump.serial]) with updated values, e.g. the
+  /// sensor's final estimate. Works in every phase so a finished routine's
+  /// table and total show the final values too.
+  void replaceJump(Jump jump) {
+    final i = _state.jumps.indexWhere((j) => j.serial == jump.serial);
+    if (i < 0) return;
+    final jumps = [..._state.jumps]..[i] = jump;
+    _state = _state.copyWith(jumps: jumps);
+  }
+
+  /// Removes a jump the sensor retracted. Only while running, and never the
+  /// routine's first jump (Start was pressed on it); the inactivity deadline
+  /// then runs from the remaining last jump.
+  void removeJump(int serial) {
+    if (_state.phase != RoutinePhase.running) return;
+    final i = _state.jumps.indexWhere((j) => j.serial == serial);
+    if (i <= 0) return;
+    final jumps = [..._state.jumps]..removeAt(i);
+    _deadline = jumps.last.landedAt.add(_timeout);
+    _state = _state.copyWith(jumps: jumps);
+  }
+
   /// Checks the inactivity deadline. Cancels the routine if it has passed.
   void tick(DateTime now) {
     final d = _deadline;

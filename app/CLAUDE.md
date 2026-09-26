@@ -7,7 +7,8 @@ This folder is part of the OpenToF monorepo (see the repo root `CLAUDE.md` for t
 repo-wide working rules). The firmware lives in `../firmware/`.
 
 **Git: never `git push`; ask the user before every commit or branch change; ask major/minor/hotfix and bump
-`version:` in `pubspec.yaml` on a commit that changes app code. Full policy in the repo root `CLAUDE.md`.**
+`version:` in `pubspec.yaml` on a commit that changes app code; major/minor also bumps the firmware to the same
+MAJOR.MINOR. Full policy in the repo root `CLAUDE.md`.**
 
 ## Read first (in this order, keep them current)
 1. `../docs/DECISIONS.md` — resolved product decisions; **overrides** the spec on conflict.

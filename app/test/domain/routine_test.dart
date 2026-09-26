@@ -5,12 +5,14 @@ import 'package:opentof_app/domain/routine.dart';
 final t0 = DateTime(2026, 1, 1, 12, 0, 0);
 const timeout = Duration(seconds: 4);
 
-Jump jumpAt(int ms, {int flight = 1000, bool missed = false}) => Jump(
-  flightMs: flight,
-  contactMs: 200,
-  landedAt: t0.add(Duration(milliseconds: ms)),
-  missedEvent: missed,
-);
+Jump jumpAt(int ms, {int flight = 1000, bool missed = false, int serial = 0}) =>
+    Jump(
+      serial: serial,
+      flightMs: flight,
+      contactMs: 200,
+      landedAt: t0.add(Duration(milliseconds: ms)),
+      missedEvent: missed,
+    );
 
 RoutineMachine started({Jump? first}) {
   final m = RoutineMachine();
@@ -220,5 +222,45 @@ void main() {
   test('jump height uses h = g*t^2/8', () {
     final j = jumpAt(0, flight: 1000);
     expect(j.heightMeters, closeTo(9.81 / 8, 1e-9));
+  });
+
+  test('flight times over 2.5 s are flagged implausible, at/under are not', () {
+    expect(jumpAt(0, flight: 2500).isImplausible, isFalse);
+    expect(jumpAt(0, flight: 2501).isImplausible, isTrue);
+    expect(jumpAt(0, flight: 1000).isImplausible, isFalse);
+  });
+
+  group('sensor corrections', () {
+    test('replaceJump updates values by serial, also after completion', () {
+      final m = started(first: jumpAt(0, serial: 1));
+      m.onJump(jumpAt(1500, serial: 2, flight: 1100));
+      m.replaceJump(jumpAt(1500, serial: 2, flight: 1050));
+      expect(m.state.jumps.map((j) => j.flightMs), [1000, 1050]);
+
+      m.cancel();
+      m.replaceJump(jumpAt(0, serial: 1, flight: 990));
+      expect(m.state.jumps.first.flightMs, 990);
+      m.replaceJump(jumpAt(0, serial: 99)); // unknown: ignored
+      expect(m.state.jumps, hasLength(2));
+    });
+
+    test('removeJump drops a retracted jump and moves the deadline back', () {
+      final m = started(first: jumpAt(0, serial: 1));
+      m.onJump(jumpAt(1500, serial: 2));
+      m.removeJump(2);
+      expect(m.state.jumps.map((j) => j.serial), [1]);
+      expect(m.deadline, t0.add(timeout));
+    });
+
+    test('removeJump never removes the first jump or touches a finished '
+        'routine', () {
+      final m = started(first: jumpAt(0, serial: 1));
+      m.removeJump(1);
+      expect(m.state.jumps, hasLength(1));
+      m.onJump(jumpAt(1500, serial: 2));
+      m.cancel();
+      m.removeJump(2);
+      expect(m.state.jumps, hasLength(2));
+    });
   });
 }

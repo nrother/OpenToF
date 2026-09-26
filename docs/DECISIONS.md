@@ -16,20 +16,42 @@ an open question: ask the user, never assume.
   no raw export (hardware doesn't support it yet). Remove from §5.3 settings. Keep code structure open to add later.
 - Debug-only **MockSensor** (fake jumps, battery drain, disconnects) behind the same interface as the BLE sensor.
 
-## BLE protocol (placeholder UUIDs in ONE file: `app/lib/data/ble/ble_protocol.dart`)
+## BLE protocol 1 (decided 2026-09-26; placeholder UUIDs in ONE file: `app/lib/data/ble/ble_protocol.dart`)
+Replaces the earlier Landing/Takeoff characteristics (flight/contact time + own sequence counters). The
+interface for algorithm authors is written up in the "Agreed interface v1" tab of the shared doc
+https://claude.ai/code/artifact/59d98f08-6d4f-4f13-aa63-a004c582f621; firmware side: `config/BleUuids.h`,
+`core/JumpDetector.h`, `core/JumpEventPublisher.h`.
 - All multi-byte values **little-endian**. UUIDs are placeholders until firmware agrees.
+- Figure: `docs/figures/jump_timing.svg` (source `jump_timing.typ`, Typst + CeTZ) shows takeoff/landing, ToF, ToB,
+  total time and the provisional/final reports for a jump N.
+- The sensor reports **events** (takeoff, landing) with a **device timestamp** (ms since boot, uint32); the app
+  derives flight time (ToF = landing − takeoff of the same jump), contact time (ToB = takeoff N − landing N−1),
+  height and totals. **No UTC / wall clock** on the device: the app uses phone receive times for routine timing.
 - Jump Service:
   | Characteristic | Props | Payload |
   |---|---|---|
-  | Landing | Notify | `flight_time_ms: uint32`, `sequence_number: uint32` (own counter) |
-  | Takeoff | Notify | `contact_time_ms: uint32`, `sequence_number: uint32` (own counter) |
-  | Device Name | Read/Write | UTF-8 string |
-- Standard Battery Service 0x180F, Battery Level Read/Notify (`uint8`, 0–100).
-- **Contact time is the one BEFORE the jump** (landing N-1 → takeoff N). Takeoff event N therefore
-  arrives *before* landing event N. A jump = landing event's flight time + the most recent takeoff event's
-  contact time. Every jump is complete the moment its landing event arrives. (Deviates from spec §3 wording.)
-- Sequence gap on either characteristic ⇒ a missed notification. Behavior: **count/continue, show a warning**
-  on the affected row + routine, and a `missed_event` flag column in the CSV. Never fabricate a jump.
+  | Event (`…0005…`) | Notify | `proto u8` (1), `jump_id u16`, `kind u8` (bit 0: 0 takeoff / 1 landing; bits 1–2: 0 provisional / 1 final / 2 retracted), `t_ms u32`, `confidence u8` (0–100, 255 = none), `reasons u8` (bitmask), then ≤ 10 bytes of custom fields |
+  | Info (`…0006…`) | Read | `proto u8`, `boot_count u16`, `device_time_ms u32` (fresh per read) |
+  | Fields (`…0007…`) | Read | JSON array describing the custom fields (`id`, `name`, `t`, `on`, optional `desc`, `unit`, `scale`, `rel`, `na`) |
+  | Reasons (`…0008…`) | Read | JSON array naming the reason bits |
+  | Confidence kind (`…0009…`) | Read | `none` / `heuristic` / `calibrated` |
+  | Device Name (`…0004…`) | Read/Write | UTF-8 string |
+  The algorithm name stays in the Device Information service (Software Revision String). UUIDs `…0002…`/`…0003…`
+  (old Landing/Takeoff) are retired, not reused. Each metadata string ≤ 512 bytes (BLE attribute limit).
+- **Two stages:** an event may come as provisional (fast estimate) and then final (≤ 200 ms after the event), or
+  final only. The app **beeps, counts and shows ToF on the provisional landing** and replaces the values in place
+  when a final arrives (last jump, chart, routine table/total, CSV); no second beep. A **retracted landing**
+  removes the jump again (from a running routine too, except the routine's first jump); a retracted takeoff
+  voids the jump before it appears.
+- Everything beyond the timestamps is **optional**: without confidence, reasons or custom fields the app just
+  shows ToF/ToB.
+- **Boot counter:** a changed `boot_count` on (re)connect ⇒ the app forgets its jump bookkeeping (device clock and
+  jump ids restarted).
+- Missed jumps: a `jump_id` gap, or a previous jump id that never became a complete jump ⇒ **count/continue,
+  show a warning** on the affected row + routine, and a `missed_event` flag column in the CSV. Never fabricate a
+  jump. **No replay buffer**: the connection is assumed to stay up; events while disconnected are lost.
+- Dropped from the algorithm team's proposal: live-state characteristic (provisional events cover it), device
+  health, commands, debug stream, replay buffer. Later: landing position / landing type (as custom fields).
 - BLE library: flutter_blue_plus 2.x with `License.nonprofit` (`License.free` is deprecated in the package). The product owner confirmed OpenToF qualifies as non-profit under the package's license terms (2026-09-21). If that ever stops being true (e.g. commercial distribution), change the license in `ble_sensor.dart` or switch libraries.
 - Scan filter: by Jump Service UUID (names are user-assignable). Flag for firmware confirmation.
 
@@ -44,13 +66,14 @@ an open question: ask the user, never assume.
 ## Feedback / Export / Settings
 - Audio: per-jump beep (toggle) plays on jumps **#1–#9, including #1 at the moment Start is pressed**; jump **#10 plays only the distinct final sound** (own separate toggle; muting it = silence on #10, independent of the per-jump toggle). Sounds are synthetic tones generated by script and bundled in `app/assets/sounds/`. No connection-error sound.
 - Chart: **bar chart, one bar per jump** (height = flight time) over a time-based rolling window (30 s / 1 min default / 5 min; Settings). Clear button empties it.
-- Export: CSV via OS share sheet only; columns jump number, flight time, contact time, (beta) height, missed_event flag; total as footer row. Works for Complete and Cancelled routines. No history browser.
+- Export: CSV via OS share sheet only; columns jump number, flight time, contact time, total time (contact + flight), (beta) height, missed_event flag, provisional flag, confidence, reasons, then one column per custom algorithm field (by `id`); total as footer row. Works for Complete and Cancelled routines, and for the last 30 s / 1 min / 5 min of jumps (see below). No history browser.
 - Settings: scan/select device, rename device, unpair, battery time remaining (phone-side extrapolation of recent battery readings), inactivity timeout (default 4 s), per-jump beep toggle, final-jump sound toggle, window length. **The start screen is always the main screen** (changed 2026-09-22; overrides the earlier "first launch opens on Settings/Pairing"). With no paired sensor the main screen shows a tappable "Pair your OpenToF sensor to get started." card that opens Settings.
 - Android: foreground service keeps BLE alive. iOS background BLE best-effort.
 
 ## Implementation choices (engineering, not product decisions — change freely)
 - Jump height uses g = 9.81 m/s². CSV in seconds/meters, 3 decimals, `.` separator, CRLF; header names are English (not localized); empty cell = unknown contact.
-- Sequence handling per counter: first event = baseline; `seq > last+1` = gap; `seq == last` = duplicate (ignored); `seq < last` = device counter reset (no gap).
+- Jump-id handling (`JumpAssembler`): first id = baseline; an id more than 1 ahead = gap; an id far behind (≥ 0x8000 back, mod 2^16) = sensor restart (new baseline, no warning); a lone landing right after (re)connecting (connected mid-flight) is no warning. Contact time skips ids voided by a retracted takeoff. A stale provisional after its final is ignored.
+- Uncertain jump = the sensor set a reason bit, or confidence < 50 (`lowConfidenceThreshold` in `jump.dart`): a `help_outline` icon on the routine row with confidence + reason texts as tooltip (reason texts come from the sensor, English only). If a final makes a jump implausible (> 2.5 s) it is removed and marked like any implausible jump.
 - Routine timing uses phone-side receive time of the landing event as "landing time".
 - Battery estimate: least-squares slope over recent readings (max 200); needs ≥ 5 min span and ≥ 1 % drop; a rising level clears history. In-memory only (not persisted across app restarts).
 - Inactivity timeout setting range in UI: 1–30 s (step 1).
@@ -67,19 +90,43 @@ an open question: ask the user, never assume.
 - **Sensor event markers are automatic and always visible** on the chart: a vertical line + Bluetooth icon for "connected" and "disconnected" (plus a legend for the types in view). Only real transitions are marked: reaching connected, and losing an established connection (not each failed reconnect attempt). Events are pruned with the 5-min history and cleared by Clear. No manual markers.
 - **Theme**: light and dark themes already existed (following the device). Settings > Appearance now has System (default) / Light / Dark.
 
+## Chart: routine start/stop markers, implausible-jump filtering (decided 2026-09-24)
+- **Routine start/stop are chart events**, same mechanism as connect/disconnect: `routineStarted` when a routine successfully starts (`SessionController.startRoutine`), `routineStopped` when it stops for any reason (10th jump reached, user Cancel, or inactivity timeout) — **one marker regardless of why it stopped**, no separate "completed" vs "cancelled" marker. A 1-jump routine (completes immediately at Start) gets both markers at the same instant.
+- **Implausible jump filtering**: a jump with flight time **> 2.5 s** (`maxPlausibleFlightSeconds` in `app/lib/domain/jump.dart`) is almost certainly a sensor glitch, not a real trampoline jump. It is **excluded from the routine (doesn't consume one of the N jump slots), the last-jump display, the chart's jump bars, `history`, and CSV export** — but a distinct `implausibleJump` chart marker (warning-triangle icon) is still added, so it's visible while debugging the firmware rather than silently vanishing. The threshold is a hardcoded constant, not a Settings option, for now.
+- Engineering: filtering happens in `SessionController._onLanding` (checks `Jump.isImplausible`), after `JumpAssembler` has already updated its sequence-gap bookkeeping — a filtered-out jump still correctly contributes to missed-notification detection for the *next* jump, it just never becomes a `Jump` the rest of the app sees.
+
 ## Exiting the app (Android, decided 2026-09-21)
 - The foreground service kept the app alive with no way to quit, so three exits exist: **(1)** an "Exit" button on the foreground-service notification, **(2)** "Exit app" in Settings (Android only) with a confirmation dialog, **(3)** pressing Back twice **on the main screen only** (in Settings Back just returns; first press shows "Press back again to exit", second within 2 s exits).
 - Exit = disconnect sensor, stop the foreground service, close the activity (`SystemNavigator.pop`). Pairing is kept; a running routine is lost. The notification button exits immediately (no dialog possible from a notification; if the UI is already gone it just stops the service). iOS has no exit option (not allowed by the platform).
 - Engineering: `exitAppProvider` (overridden in tests), `ForegroundService` relays the button press from the service isolate to the main isolate (`initCommunicationPort` in `main()`).
 
-## Branding & version (decided 2026-09-21)
-- Source logo: `app/assets/images/OpenToF_logo.png` (546x478, opaque near-white bg). Derived images (subtitle line cropped off, near-white snapped to white) are generated by `app/tool/generate_branding.ps1` into `app/assets/images/OpenToF_logo_wordmark.png` and `app/assets/branding/`.
-- Theme seed color: logo blue `#0052EE` (sampled from the logo's ball). Material 3 derives a tonal palette from it, so the exact primary differs slightly.
-- **New mark (2026-09-22)**: `app/assets/branding/app_icon2.png` (stopwatch ring with a jumper dot and a trampoline, one blue `#1A7EFD` on a dark background). `app/tool/generate_branding.ps1` removes the background (colour-to-alpha, keeps soft edges) and derives everything. Used for **small sizes**: launcher icon (iOS + Android adaptive on white; Android 13 themed/monochrome layer), native splash (transparent mark on white light / `#121318` dark; Android 12 icon circle in the same background colour), the Android notification status-bar icon (white glyph `ic_stat_opentof`, accent `#1A7EFD`) and the main-screen app bar (`BrandMark`).
-- The mark is judged fine for favicon/splash but **not polished enough for a large logo**: the Settings header keeps the old wordmark logo until a detailed larger version exists (see `docs/LOGO_PROMPT.md`, "Polishing app_icon2").
-- In-app: `BrandMark` in the main-screen app bar (next to the title), `BrandLogo` (old wordmark, subtitle cropped) at the top of Settings. Not in an About section.
-- Settings shows the app version (`version` from `app/pubspec.yaml`, as "1.0.0 (1)") in an About section.
-- Theme seed is still the old logo blue `#0052EE` (not changed with the new mark, whose blue is `#1A7EFD`: open question). Web target files (`app/web/`) are not branded (not a v1 target).
+## Branding & version (decided 2026-09-21, logo replaced 2026-09-26)
+- **Sources live in the repo root `img/`** (shared by app, docs and README; the app only holds derived copies):
+  - `opentof-logo.svg` / `opentof-logo.png`: the logo (stopwatch, jumper, trampoline), blue `#0153E3`, red `#DE2237`
+    bed marking, transparent background with an opaque white bed.
+  - `OpenToF_Wordmark.png`: the "OPENTOF" lettering, black on transparent.
+  - Built from those by `img/make_wordmark.py` (Pillow): `OpenToF_Wordmark_color.png` ("OPEN" dark blue `#0B2A6F`,
+    "TOF" logo blue) and `OpenToF_Wordmark_logo.png` (same, second O replaced by the logo at 2x the letter height,
+    the lower edge of its white trampoline bed on the letters' baseline).
+  - **Dark-theme versions** (same script; rendering the recoloured SVG needs `typst` on PATH): `opentof-logo-dark.svg` /
+    `.png` (blue lightened to `#5B9BFF`, white bed and red marking kept) and `OpenToF_Wordmark_color_dark.png` /
+    `OpenToF_Wordmark_logo_dark.png` ("OPEN" `#E8EEFA`, "TOF" `#5B9BFF`). Contrast on the app's dark surface `#121318`:
+    ≥ 6.7:1 instead of 3.0:1 (logo blue) / 1.4:1 (dark blue). The app picks them by theme brightness (`BrandMark`,
+    `BrandLogo`: `OpenToF_mark_dark.png`, `OpenToF_wordmark_dark.png`) and the dark native splash uses them
+    (`image_dark`). The launcher icon stays the light version (it sits on white).
+- Replaced (removed): the old wordmark logo `app/assets/images/OpenToF_logo.png` (+ derived `OpenToF_logo_wordmark.png`),
+  the interim mark `app/assets/branding/app_icon2.png`, and `img/OpenToF_logo.png`.
+- `app/tool/generate_branding.ps1` derives the app images from `img/`: `assets/images/OpenToF_wordmark.png` (logo
+  wordmark, Settings header), `assets/images/OpenToF_mark.png` (logo, app bar) and `assets/branding/` (launcher icon:
+  iOS + Android adaptive on white, Android 13 themed/monochrome layer; native splash: transparent logo on white light /
+  `#121318` dark; Android notification status-bar icon `ic_stat_opentof`). White/monochrome variants knock the white
+  bed out as a hole. Then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`.
+- Theme seed and notification accent colour: the logo blue `#0153E3` (Material 3 derives a tonal palette from it, so
+  the exact primary differs slightly).
+- In-app: `BrandMark` (logo) in the main-screen app bar next to the title; `BrandLogo` (logo wordmark, transparent,
+  light/dark version by theme; scales down to fit narrow phones) at the top of Settings. Not in an About section.
+- Settings shows the app version (`version` from `app/pubspec.yaml`, as "0.4.0 (3)") in an About section.
+- Web target files (`app/web/`) are not branded (not a v1 target).
 
 ## Firmware (`firmware/OpenToF_Firmware/OpenToF_Firmware.ino`, decided 2026-09-21)
 - Silicon Labs Arduino core, protocol stack **"BLE (Arduino)"** (ArduinoBLE API); IMU via Seeed_Arduino_LSM6DS3 (I2C 0x6A, IMU powered from PD5); battery via PD3 (enable) / PD4 (ADC, ½ divider), mapped to % with a rough single-cell LiPo curve.
@@ -93,7 +140,7 @@ an open question: ask the user, never assume.
 - **`firmware/datalogger.ino` moved to `firmware/datalogger/datalogger.ino`** (2026-09-22): it was a loose file directly in `firmware/`, which the Arduino IDE/`arduino-cli` cannot open or compile at all — a sketch's folder name must match its main `.ino` filename (confirmed: `arduino-cli compile` on the old path failed with "Hauptdatei fehlt im Sketch" / main file missing). Companion files the sketch's own comments expect next to it (`capture_serial.py`, a `README.md`) do not exist yet — out of scope here, belongs to whoever owns the data-analysis side. After the move, compiled and flashed to a real board and functionally verified: `s` starts a recording, real CSV rows come out with physically plausible accel/gyro values (confirms its read approach, the same six-small-reads pattern as the fix above, genuinely works on this hardware). Observed nearly every row flagged `status=1` (late) at an effective ~160 Hz against the 416 Hz nominal rate during that test — likely an artifact of the slow (150 ms-interval) polling script used to read it rather than a firmware bug, since a real terminal drains continuously; not fixed or investigated further, flag if it reproduces with a real serial terminal.
 - **Diagnostic serial logging** (2026-09-22, all compiled out when `DEBUG_SERIAL` is 0): `ImuSource` prints an "IMU: N samples in 2 s (~Hz), M I2C failures" heartbeat every `IMU_HEARTBEAT_MS` (`config/FirmwareConfig.h`); `JumpEventPublisher` logs every transition the algorithm reports, including ones the firmware ignores (duplicate takeoff, landing before any takeoff); `BleService` logs when an event is sent but no app is subscribed. This is what surfaced the bug above — read it top to bottom when a detector reports nothing: no `IMU:` lines at all → check `DEBUG_SERIAL`/baud; `0 samples ... NO DATA` → I2C read is failing (see the bug above for the fix already applied — if it recurs, add a live I2C scan and cross-check against the library's own accessor before assuming it's the same cause); healthy sample rate but never a takeoff/landing line → the algorithm itself isn't firing; "ignored" lines → algorithm state-machine bug; normal lines but the app sees nothing → check for "no app subscribed".
 - Arduino IDE pitfall: free functions must not use sketch-defined types in signatures (auto-generated prototypes sit above the type definitions).
-- Sequence counters increment per event even while disconnected. The first takeoff after boot sends no takeoff event (no previous landing).
+- Protocol 1 (firmware v0.4.0, 2026-09-26): `jump_id` increments per new jump even while disconnected. The first takeoff after boot is sent like any other (the app shows its contact time as unknown). `JumpEventPublisher` enforces the provisional/final/retract rules and drops + logs (`event ignored: …`) calls that break them. Boot counter in EEPROM at offset 32 (magic `0x42 0x43` + u16), incremented in `setup()`. Metadata strings whose length is an exact multiple of 22 get a trailing space (ArduinoBLE answers a read blob at offset == length with an error). `DEMO_MODE 1` sends two-stage events with confidence, a reason bit, the two intensity fields and occasional retracted false landings.
 - Unverified engineering choices: gyro range ±500 dps, connection interval 7.5–15 ms, advertising interval 100 ms, onboard antenna selected (PB5 high, PB4 low, as in Seeed's BLE example).
 - **Firmware v0.3.0 is multi-file** (2026-09-21): `OpenToF_Firmware.ino` holds only `setup()/loop()`; everything else is a header in one of three subfolders: `config/` (`FirmwareConfig.h` settings + identity strings, `BleUuids.h` all UUIDs + protocol text), `algorithms/` (one header per algorithm — `MyJumpDetector.h`, `StaLtaJumpDetector.h`, `AzPipelineJumpDetector.h`; `BatteryCurve.h` voltage→%), `core/` (plumbing, normally not edited). Includes are relative to the including file (`../core/X.h`); the sketch root is NOT on the include path. Note: the Arduino IDE 2 only shows root-level files as tabs, so files in the subfolders have to be opened in another editor (compiling is unaffected).
 - **Algorithm selection lives at the top of the `.ino`** (2026-09-22, at the user's request, revised same day to a plain comment-toggle after an intermediate numeric-macro version felt overbuilt): an "Algorithm selection" block right under the file header comment has one `#include "algorithms/X.h"` + `typedef X ActiveJumpDetector;` pair per algorithm; exactly one pair is uncommented. No `Algorithms.h` dispatcher file. To add an algorithm: copy `MyJumpDetector.h`, rename the class, and add a new commented-out pair to the block (or uncomment it to make it active). Uncommenting zero or more than one pair is a normal-looking compiler error (`ActiveJumpDetector` undeclared, or redefinition) rather than a custom check.
@@ -109,14 +156,36 @@ an open question: ask the user, never assume.
   | | Software Revision String | `2A28` | name of the active jump detector (`JumpDetector::name()`, e.g. `MyJumpDetector`; `Demo (simulated jumps)` in demo mode), cut to 32 bytes |
   | Generic Access `1800` | Appearance | `2A01` | `0x0540` Generic Sensor |
   All DIS values are UTF-8, Read only, ≤ 32 bytes. Not exposed but listed in `BleUuids.h` as candidates: System ID `2A23`, PnP ID `2A50`, Battery Time Status `2BEE` / Critical Status `2BE9` / Power State `2A1A`, Temperature `2A6E`.
-- **Descriptions for the custom characteristics**: Landing, Takeoff and Name carry a GATT *Characteristic User Description* descriptor (`0x2901`, texts `DESC_*` in `BleUuids.h`) so scanners show what they are. Services cannot carry descriptions.
+- **Descriptions for the custom characteristics**: every custom characteristic (Event, Info, Fields, Reasons, Confidence kind, Name) carries a GATT *Characteristic User Description* descriptor (`0x2901`, texts `DESC_*` in `BleUuids.h`) so scanners show what they are. Services cannot carry descriptions.
 - **No charging flag** (decided 2026-09-22): the Battery Level Status characteristic (`2BED`) is not exposed. The XIAO MG24's charger only drives the red charge LED; the Seeed wiki says the charge state is not available to the MCU and the Silicon Labs core defines no charge/VBUS pin. The product owner does not want inferred data (e.g. a voltage guess), so the red LED is the charging indicator. Do not add a guessed charge state.
 ## App: Device Information Service (decided 2026-09-22)
 - The app now reads all six fields above once per connection (`Sensor.readDeviceInfo()` / `BleSensor` reads them from the already-discovered services; `MockSensor` returns fixed placeholder values) and shows them read-only in **Settings → Device info** (below Battery, only while a sensor is paired): Manufacturer, Model, Serial number, Hardware revision, Firmware revision, and "Detection algorithm" (the Software Revision String). A missing field (older firmware) shows `–`; a read failure keeps whatever was read before rather than clearing it.
 - `app/lib/data/ble/ble_protocol.dart` gained the Device Information Service UUID and its six characteristic UUIDs, plus a generic `parseUtf8String` (also backs `parseName`).
 
+## App: sensor page, version warning, jump display, export choice (decided 2026-09-26)
+- **Sensor page** (`lib/ui/settings/sensor_screen.dart`): tapping the paired sensor in Settings (tile or its chevron)
+  opens it. It holds Battery, Device info (+ protocol version and boot count from the Info characteristic) and
+  "Detection algorithm" (name, confidence kind, reason names, custom fields with description/unit/type). Settings
+  keeps pairing, rename and unpair only.
+- **Version warning**: shown in Settings (under the sensor) and on the sensor page when app and firmware
+  MAJOR.MINOR differ (`lib/domain/version_check.dart`); no warning while the firmware version is unknown.
+- **Jump display** settings: "Show time on bed" and "Show total jump time" (bed + flight), both off by default.
+  They add a line under the last jump ("Bed: … Bed+Flight: …") and table columns; with extra columns the "s" unit
+  moves into the column headers and cell padding shrinks so the table fits a 360 dp phone. Total time is unknown
+  when the contact time is (first jump after connecting). The routine total row stays flight-only.
+- **Export chooser**: the export button shows whenever there is a finished routine or any jump in the chart
+  history; a bottom sheet offers the recorded routine or the last 30 s / 1 min / 5 min (the chart window options,
+  max = the 5 min history). File names `opentof_routine_…csv` / `opentof_jumps_…csv`. CSV gained `total_time_s`.
+- **More jump details** (setting, off by default; chosen with the product owner): one switch plus a checklist of
+  the sensor's values (its confidence and each custom field; stored as *hidden* ids in `hidden_jump_details`, so
+  values a new algorithm adds show up by default). When on: one grey line under the last jump ("Confidence 87 % ·
+  Landing intensity 143"), one routine-table column per chosen value (more than 5 columns → the table scrolls
+  sideways), and tapping the last jump, a table row or a chart bar opens a sheet with everything about that jump
+  (all values regardless of the checklist). The checklist only lists values of the currently connected sensor.
+
 ## Still open (do not assume — ask when reached)
-- Real GATT UUIDs / firmware confirmation of the protocol above (placeholders in both app and firmware).
+- Real GATT UUIDs (placeholders in both app and firmware).
+- Whether custom-field names/descriptions should be translated (currently English from the sensor; the app could map known `id`s).
 - The real takeoff/landing detection algorithm (to be written by the user in `MyJumpDetector`).
 - Very long contact times (standing still, then bouncing) are reported as-is; the app/firmware may want a cap.
 - Whether the hardware revision string (`0.1` in `FirmwareConfig.h`, documented above as placeholder `1.0` — check which is current) is right for the real board.

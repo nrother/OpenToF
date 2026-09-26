@@ -6,61 +6,85 @@ import 'package:opentof_app/domain/sensor_events.dart';
 
 void main() {
   late MockSensor s;
-  late List<LandingEvent> landings;
-  late List<TakeoffEvent> takeoffs;
+  late List<JumpEvent> events;
 
   setUp(() async {
     s = MockSensor();
-    landings = [];
-    takeoffs = [];
-    s.landings.listen(landings.add);
-    s.takeoffs.listen(takeoffs.add);
+    events = [];
+    s.events.listen(events.add);
     await s.connect();
   });
 
   tearDown(() => s.close());
+
+  Future<JumpUpdate?> feedAll(JumpAssembler a) async {
+    await Future<void>.delayed(Duration.zero);
+    JumpUpdate? last;
+    for (final e in events) {
+      last = a.onEvent(e) ?? last;
+    }
+    events.clear();
+    return last;
+  }
 
   test('connect reports connected', () {
     expect(s.currentConnectionState, SensorConnectionState.connected);
   });
 
   test(
-    'emitJump sends takeoff before landing with matching sequences',
+    'emitJump sends a final takeoff and landing sharing a jump id',
     () async {
-      s.emitJump(flightMs: 1234, contactMs: 200);
+      s.emitJump(flightMs: 1234);
       await Future<void>.delayed(Duration.zero);
-      expect(takeoffs.single.contactMs, 200);
-      expect(landings.single.flightMs, 1234);
-      expect([takeoffs.single.sequence, landings.single.sequence], [1, 1]);
+      expect(events.map((e) => e.type), [
+        JumpEventType.takeoff,
+        JumpEventType.landing,
+      ]);
+      expect(events.map((e) => e.stage).toSet(), {JumpEventStage.finalized});
+      expect(events.map((e) => e.jumpId).toSet(), {1});
+      expect(events[1].deviceTimeMs - events[0].deviceTimeMs, 1234);
     },
   );
 
-  test(
-    'events while disconnected are lost and show up as a sequence gap',
-    () async {
-      final a = JumpAssembler();
-      s.emitJump();
-      await Future<void>.delayed(Duration.zero);
-      a.onTakeoff(takeoffs.last);
-      expect(a.onLanding(landings.last)!.missedEvent, isFalse);
-
-      s.simulateDisconnect();
-      s.emitJump(); // lost
-      s.simulateReconnect();
-      s.emitJump();
-      await Future<void>.delayed(Duration.zero);
-      expect(landings.length, 2);
-      a.onTakeoff(takeoffs.last);
-      expect(a.onLanding(landings.last)!.missedEvent, isTrue);
-    },
-  );
-
-  test('dropNextLanding creates a landing gap', () async {
+  test('contact time is measured from the previous landing', () async {
+    final a = JumpAssembler();
     s.emitJump();
-    s.dropNextLanding();
+    s.emitJump(flightMs: 1100, contactMs: 230);
+    final u = await feedAll(a);
+    final j = (u! as JumpAdded).jump;
+    expect(j.flightMs, 1100);
+    expect(j.contactMs, 230);
+  });
+
+  test('events while disconnected are lost and show up as a gap', () async {
+    final a = JumpAssembler();
+    s.emitJump();
+    expect(((await feedAll(a))! as JumpAdded).jump.missedEvent, isFalse);
+
+    s.simulateDisconnect();
+    s.emitJump(); // lost
+    s.simulateReconnect();
+    s.emitJump();
+    expect(((await feedAll(a))! as JumpAdded).jump.missedEvent, isTrue);
+  });
+
+  test('dropNextJump skips a jump id', () async {
+    s.emitJump();
+    s.dropNextJump();
     s.emitJump();
     await Future<void>.delayed(Duration.zero);
-    expect(landings.map((e) => e.sequence), [1, 3]);
+    expect(events.map((e) => e.jumpId), [1, 1, 3, 3]);
+  });
+
+  test('metadata describes the two intensity fields', () async {
+    final m = await s.readAlgorithmMetadata();
+    expect(m.fields.map((f) => f.id), ['pi', 'li']);
+    expect(m.confidenceKind, 'heuristic');
+    expect(m.reasons, hasLength(1));
+    s.emitJump();
+    final j = ((await feedAll(JumpAssembler(metadata: m)))! as JumpAdded).jump;
+    expect(j.fields.keys.toSet(), {'pi', 'li'});
+    expect(j.confidence, 90);
   });
 
   test('battery level is emitted on connect and on change', () async {
@@ -85,5 +109,6 @@ void main() {
     expect(info.hardwareRevision, isNotNull);
     expect(info.firmwareRevision, isNotNull);
     expect(info.softwareRevision, isNotNull);
+    expect((await s.readSensorInfo())!.protocol, 1);
   });
 }

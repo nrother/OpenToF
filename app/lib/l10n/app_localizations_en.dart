@@ -101,6 +101,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chartPaused => 'paused';
 
   @override
+  String get chartRoutineStarted => 'Routine started';
+
+  @override
+  String get chartRoutineStopped => 'Routine stopped';
+
+  @override
+  String get chartImplausibleJump => 'Implausible jump (ignored)';
+
+  @override
   String get pauseChart => 'Pause';
 
   @override
@@ -348,11 +357,158 @@ class AppLocalizationsEn extends AppLocalizations {
   String get simSingleJump => 'Single jump';
 
   @override
-  String get simDropLanding => 'Drop next landing';
+  String get simDropJump => 'Drop next jump';
 
   @override
   String get simDisconnect => 'Simulate disconnect';
 
   @override
   String get simReconnect => 'Simulate reconnect';
+
+  @override
+  String get uncertainJumpWarning => 'The sensor is unsure about this jump';
+
+  @override
+  String confidenceValue(int value) {
+    return 'Confidence: $value %';
+  }
+
+  @override
+  String get versionMismatchTitle => 'Sensor firmware doesn\'t match this app';
+
+  @override
+  String versionMismatchBody(String app, String firmware) {
+    return 'App $app, sensor firmware $firmware. Update the older one, otherwise jumps may not be received.';
+  }
+
+  @override
+  String get sensorDetails => 'Sensor details';
+
+  @override
+  String get algorithmSection => 'Detection algorithm';
+
+  @override
+  String get protocolVersionLabel => 'Protocol version';
+
+  @override
+  String get bootCountLabel => 'Sensor starts';
+
+  @override
+  String get confidenceKindLabel => 'Confidence';
+
+  @override
+  String get confidenceKindNone => 'Not provided';
+
+  @override
+  String get confidenceKindHeuristic => 'Estimate (higher = more reliable)';
+
+  @override
+  String get confidenceKindCalibrated => 'Calibrated probability';
+
+  @override
+  String get reasonsLabel => 'Reasons for uncertainty';
+
+  @override
+  String get customFieldsLabel => 'Extra values per jump';
+
+  @override
+  String get noneProvided => 'None';
+
+  @override
+  String get fieldOnTakeoff => 'at takeoff';
+
+  @override
+  String get fieldOnLanding => 'at landing';
+
+  @override
+  String get fieldOnBoth => 'at takeoff and landing';
+
+  @override
+  String get fieldRelative => 'relative values';
+
+  @override
+  String get displaySection => 'Jump display';
+
+  @override
+  String get showContactTime => 'Show time on bed';
+
+  @override
+  String get showContactTimeHelp => 'Contact time before each jump';
+
+  @override
+  String get showTotalTime => 'Show total jump time';
+
+  @override
+  String get showTotalTimeHelp => 'Time on bed + flight time';
+
+  @override
+  String get contactLabel => 'Bed';
+
+  @override
+  String get totalTimeLabel => 'Bed+Flight';
+
+  @override
+  String columnSeconds(String label) {
+    return '$label (s)';
+  }
+
+  @override
+  String get exportChooserTitle => 'Export as CSV';
+
+  @override
+  String get exportRoutine => 'Recorded routine';
+
+  @override
+  String exportLastWindow(String window) {
+    return 'Last $window';
+  }
+
+  @override
+  String jumpCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count jumps',
+      one: '1 jump',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showJumpDetails => 'Show more jump details';
+
+  @override
+  String get showJumpDetailsHelp =>
+      'Extra values from the sensor under the last jump and in the routine table. Tap a jump for all its details.';
+
+  @override
+  String get detailsToShow => 'Values to show';
+
+  @override
+  String get detailsNoSensorValues =>
+      'Connect a sensor to see which values it provides.';
+
+  @override
+  String get jumpDetailsTitle => 'Jump details';
+
+  @override
+  String get landedAtLabel => 'Landed at';
+
+  @override
+  String get flightTimeLabel => 'Flight time';
+
+  @override
+  String get contactTimeLabel => 'Time on bed';
+
+  @override
+  String get totalJumpTimeLabel => 'Total time (bed + flight)';
+
+  @override
+  String get stageLabel => 'Status';
+
+  @override
+  String get stageFinal => 'Final';
+
+  @override
+  String get stageProvisional => 'Provisional (sensor\'s first estimate)';
 }

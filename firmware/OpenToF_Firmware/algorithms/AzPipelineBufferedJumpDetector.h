@@ -1,9 +1,9 @@
 // ============================================================================
-// AzPipelineBufferedJumpDetector -- wraps tmp/third_data/OpenToF_MG24_Buffer_Online.cpp
+// AzPipelineBufferedJumpDetector -- wraps docs/reference/batch3/OpenToF_MG24_Buffer_Online.cpp
 // (given, not derived) into the JumpDetector interface.
 //
 // Third design point in the az-pipeline family (see
-// analysis/third_data/README.md, "A second reference implementation"): same
+// experiments/batch3_mg24/README.md, "A second reference implementation"): same
 // zone -> merge -> expand-to-zero -> dip -> 2nd-max detection as the offline
 // pipeline (not a simplified causal proxy like AzPipelineJumpDetector.h's), made
 // implementable on-device via:
@@ -13,7 +13,7 @@
 //      Butterworth), whose delay varies with frequency and is only approximately
 //      correctable, this constant delay can be *exactly* subtracted back out of
 //      every detected timestamp. That's the whole trick, and it's why this design
-//      gets ~8ms timing error (analysis/third_data/az_pipeline_buffered.py,
+//      gets ~8ms timing error (src/opentof_research/detectors/az_pipeline.py (process_buffered),
 //      matching this file almost line for line) against the plain online version's
 //      76ms.
 //   2. Detection runs retrospectively over a ~3.85s circular buffer instead of
@@ -21,9 +21,14 @@
 // Cost: a real, measured delay -- the FIR's fixed ~240ms, plus however long it takes
 // to see the *next* jump's landing (a takeoff isn't reported as real until the
 // flight after it is also confirmed). Measured at ~900ms-1.3s on the reference
-// recordings (analysis/third_data/README.md) -- longer than the ~700ms this was
+// recordings (experiments/batch3_mg24/README.md) -- longer than the ~700ms this was
 // designed around, because that number is inherently session-dependent (it shrinks
 // for faster bouncing, grows for slower).
+//
+// v2 (algorithm interface v1): input resampled to an exact 416 Hz grid (the MCU
+// delivers ~285 samples/s with jitter), 16 g profile, explicit FINAL events. Its
+// ~1 s reporting delay violates the interface's 200 ms final deadline -- see
+// onSample(); not suitable for live feedback.
 //
 // Only real changes from the given .cpp:
 //   - Its internal `JumpDetector` class is renamed `AzBufferedZoneDetector` --
@@ -69,8 +74,8 @@ static constexpr int    AZBUF_ALIGN_SIZE            = 1600;   // ~3.85s at 416Hz
 
 // ============================================================================
 // FIR coefficients -- scipy.signal.firwin(201, 5.0/(416/2)); verified to match
-// tmp/third_data/OpenToF_MG24_Buffer_Online.cpp's hardcoded table bit-for-bit
-// (see analysis/third_data/az_pipeline_buffered.py).
+// docs/reference/batch3/OpenToF_MG24_Buffer_Online.cpp's hardcoded table bit-for-bit
+// (see src/opentof_research/detectors/az_pipeline.py (process_buffered)).
 // ============================================================================
 static const float AZBUF_FIR_TAPS[AZBUF_FIR_TAPS_N] = {
     2.4262018542e-04f, 2.3928769912e-04f, 2.3579065617e-04f, 2.3199748068e-04f, 2.2773425837e-04f, 2.2278625538e-04f, 2.1690018860e-04f, 2.0978723942e-04f,
@@ -373,7 +378,7 @@ class AzBufferedPipeline {
 // AzBufFlightResult only carries a *sample count* (delay-corrected) and a flight
 // *duration* -- not the real wall-clock timestamps landing()/takeoff() need
 // (uint64_t microseconds). To recover those without assuming a perfectly even
-// sample grid (see firmware/CLAUDE.md and analysis/DATA_FORMAT.md on why that
+// sample grid (see firmware/CLAUDE.md and docs/DATA_FORMAT.md on why that
 // assumption is avoided elsewhere in this project), this class keeps its own small
 // ring buffer of the real `s.timeUs` for every sample it hands to the pipeline,
 // sized to exactly match the pipeline's own AZBUF_ALIGN_SIZE -- so any sample_index
@@ -385,48 +390,82 @@ class AzBufferedPipeline {
 // ============================================================================
 class AzPipelineBufferedJumpDetector : public JumpDetector {
  public:
-  const char* name() const override { return "AzPipelineBufferedJumpDetector v1"; }
+  const char* name() const override { return "AzPipelineBuffered v2"; }
 
-  // Locked to 416Hz: every constant above (FIR taps, MERGE_GAP, MIN_*_SAMPLES, the
-  // +102/+17 sample corrections) was generated/validated for exactly 416Hz and
-  // would silently mean something different at another rate (a 201-tap FIR
-  // designed for a 416Hz Nyquist has a *different* cutoff-in-Hz at 833Hz, and every
-  // sample-count constant would represent half the intended duration). That forces
-  // PROFILE_416HZ_8G here rather than the 16g profile the other two detectors use
-  // -- a real, open trade-off: the reference recordings peaked near 16g on hard
-  // landings, so this profile can clip. Not silently accepted: flagged here and in
-  // analysis/third_data/README.md. If your FirmwareConfig.h defines a
-  // PROFILE_416HZ_16G, prefer it -- not confirmed to exist, so not assumed.
-  const ImuProfile& imuProfile() const override { return PROFILE_416HZ_8G; }
+  // Every constant above (FIR taps, MERGE_GAP, MIN_*_SAMPLES, the +102/+17 sample
+  // corrections) is only valid at exactly 416 Hz. v1 therefore requested
+  // PROFILE_416HZ_8G -- but the MCU does not deliver the nominal rate (the 833 Hz
+  // profile yields ~285 samples/s with jitter), so the constants were silently wrong
+  // on hardware. v2 resamples whatever arrives onto an exact 416 Hz grid (linear
+  // interpolation on the s.timeUs clock) before the pipeline, which keeps the given
+  // logic valid at any input rate -- and lets this detector use the 16 g range like
+  // the others, removing v1's clipping trade-off.
+  const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
 
   void begin() override {
     _pipeline.reset();
     _sampleCounter = 0;
+    _haveLast = false;
+    _tickIndex = 0;
   }
 
+  // Interface v1 usage: FINAL events only, no confidence/reasons/fields. A jump is
+  // only resolved once the *next* landing has been seen, so both events arrive
+  // ~0.9-1.3 s after the takeoff (FIR delay + waiting for the next contact). That
+  // VIOLATES the interface's 200 ms final deadline: the app counts and beeps each
+  // jump about a second late. Use this detector for logging/offline-grade timing,
+  // not for live feedback.
   void onSample(const ImuData& s) override {
+    if (!_haveLast) {
+      _t0Us = s.timeUs;
+      _nextTickUs = s.timeUs;
+      _lastUs = s.timeUs;
+      _lastAz = s.az;
+      _haveLast = true;
+    }
+    // every 416 Hz tick in (last sample, this sample] -- the first call emits tick 0
+    while (_nextTickUs <= s.timeUs) {
+      float az = s.az;
+      if (s.timeUs > _lastUs) {
+        const float w = (float)(_nextTickUs - _lastUs) / (float)(s.timeUs - _lastUs);
+        az = _lastAz + w * (s.az - _lastAz);
+      }
+      feed(az, _nextTickUs);
+      _tickIndex++;
+      _nextTickUs = _t0Us + (uint64_t)((double)_tickIndex * 1e6 / (double)AZBUF_FS + 0.5);
+    }
+    _lastUs = s.timeUs;
+    _lastAz = s.az;
+  }
+
+ private:
+  void feed(float az, uint64_t tickUs) {
     const bool wasCalibrated = _pipeline.isCalibrated();
-    _pipeline.process_sample(s.az);
+    _pipeline.process_sample(az);
 
     if (wasCalibrated) {
-      // Only record a timestamp for samples the pipeline actually buffered --
-      // process_sample() returns early (without pushing) on the very sample where
-      // calibration completes, so the first pushed sample is the *next* one.
-      _timeUsRing[_sampleCounter % AZBUF_ALIGN_SIZE] = s.timeUs;
+      // Only record a timestamp for ticks the pipeline actually buffered --
+      // process_sample() returns early (without pushing) on the very tick where
+      // calibration completes, so the first pushed tick is the *next* one.
+      _timeUsRing[_sampleCounter % AZBUF_ALIGN_SIZE] = tickUs;
       ++_sampleCounter;
     }
 
     AzBufFlightResult r;
     while (_pipeline.popNextJump(r)) {
-      uint64_t takeoffUs = _timeUsRing[r.sample_index % AZBUF_ALIGN_SIZE];
-      uint64_t landingUs = takeoffUs + (uint64_t)(r.flight_ms * 1000.0f + 0.5f);
-      takeoff(takeoffUs);
-      landing(landingUs);
+      const uint64_t takeoffUs = _timeUsRing[r.sample_index % AZBUF_ALIGN_SIZE];
+      const uint64_t landingUs = takeoffUs + (uint64_t)(r.flight_ms * 1000.0f + 0.5f);
+      takeoff(takeoffUs, STAGE_FINAL);   // resolved in pairs: always on the bed here
+      landing(landingUs, STAGE_FINAL);
     }
   }
 
- private:
   AzBufferedPipeline _pipeline;
   uint64_t _timeUsRing[AZBUF_ALIGN_SIZE];
   uint32_t _sampleCounter = 0;
+  // 416 Hz resampler
+  bool _haveLast = false;
+  uint64_t _t0Us = 0, _nextTickUs = 0, _lastUs = 0;
+  uint32_t _tickIndex = 0;
+  float _lastAz = 0.0f;
 };

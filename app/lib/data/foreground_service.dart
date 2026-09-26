@@ -105,7 +105,7 @@ class ForegroundService {
         notificationText: text,
         notificationIcon: const NotificationIcon(
           metaDataName: notificationIconMetaData,
-          backgroundColor: Color(0xFF1A7EFD), // blue of the logo mark
+          backgroundColor: Color(0xFF0153E3), // blue of the logo
         ),
         notificationButtons: [
           NotificationButton(id: exitButtonId, text: exitButtonText),

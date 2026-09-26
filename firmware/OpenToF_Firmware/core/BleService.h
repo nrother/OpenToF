@@ -6,8 +6,11 @@
 
 #include "../config/BleUuids.h"
 #include "../config/FirmwareConfig.h"
+#include "BootCounter.h"
 #include "DeviceName.h"
 #include "Logging.h"
+#include "Micros64.h"
+#include "Transition.h"
 
 // Longest string a Device Information characteristic can hold.
 static const int DIS_STRING_MAX = 32;
@@ -19,11 +22,21 @@ DIS_CHECK(MODEL_NUMBER);
 
 // ---- Jump service ----
 static BLEService jumpService(UUID_JUMP_SERVICE);
-static BLECharacteristic landingChar(UUID_LANDING, BLENotify, 8, true);
-static BLECharacteristic takeoffChar(UUID_TAKEOFF, BLENotify, 8, true);
+static const int EVENT_FIXED_BYTES = 10;
+static const int INFO_BYTES = 7;
+static const int META_MAX_BYTES = 512;  // longest value a BLE attribute can hold
+static BLECharacteristic eventChar(UUID_EVENT, BLENotify, EVENT_FIXED_BYTES + EVENT_EXTRAS_MAX,
+                                   false);
+static BLECharacteristic infoChar(UUID_INFO, BLERead, INFO_BYTES, true);
+static BLECharacteristic fieldsChar(UUID_FIELDS, BLERead, META_MAX_BYTES, false);
+static BLECharacteristic reasonsChar(UUID_REASONS, BLERead, META_MAX_BYTES, false);
+static BLECharacteristic confidenceKindChar(UUID_CONFIDENCE_KIND, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic nameChar(UUID_NAME, BLERead | BLEWrite, NAME_MAX_BYTES, false);
-static BLEDescriptor landingDescription(SIG_DESC_USER_DESCRIPTION, DESC_LANDING);
-static BLEDescriptor takeoffDescription(SIG_DESC_USER_DESCRIPTION, DESC_TAKEOFF);
+static BLEDescriptor eventDescription(SIG_DESC_USER_DESCRIPTION, DESC_EVENT);
+static BLEDescriptor infoDescription(SIG_DESC_USER_DESCRIPTION, DESC_INFO);
+static BLEDescriptor fieldsDescription(SIG_DESC_USER_DESCRIPTION, DESC_FIELDS);
+static BLEDescriptor reasonsDescription(SIG_DESC_USER_DESCRIPTION, DESC_REASONS);
+static BLEDescriptor confidenceKindDescription(SIG_DESC_USER_DESCRIPTION, DESC_CONFIDENCE_KIND);
 static BLEDescriptor nameDescription(SIG_DESC_USER_DESCRIPTION, DESC_NAME);
 
 // ---- Battery service ----
@@ -43,9 +56,6 @@ static BLEStringCharacteristic firmwareRevisionChar(SIG_CHR_FIRMWARE_REVISION, B
 static BLEStringCharacteristic softwareRevisionChar(SIG_CHR_SOFTWARE_REVISION, BLERead,
                                                     DIS_STRING_MAX);
 
-static uint32_t landingSeq = 0;
-static uint32_t takeoffSeq = 0;
-
 static void putU32LE(uint8_t* p, uint32_t v) {
   p[0] = (uint8_t)v;
   p[1] = (uint8_t)(v >> 8);
@@ -53,25 +63,63 @@ static void putU32LE(uint8_t* p, uint32_t v) {
   p[3] = (uint8_t)(v >> 24);
 }
 
-// Sends {duration_ms, sequence} as a notification (dropped by the stack if nobody is subscribed).
-static void notifyEvent(const char* label, BLECharacteristic& c, uint32_t durationMs,
-                        uint32_t seq) {
-  uint8_t payload[8];
-  putU32LE(payload, durationMs);
-  putU32LE(payload + 4, seq);
-  c.writeValue(payload, sizeof(payload));
-  if (!c.subscribed()) {
+// Event `kind` byte: bit 0 = landing, bits 1..2 = stage.
+static const uint8_t EVENT_STAGE_PROVISIONAL = 0;
+static const uint8_t EVENT_STAGE_FINAL = 1;
+static const uint8_t EVENT_STAGE_RETRACTED = 2;
+
+// Sends one event notification (layout in BleUuids.h). Dropped by the stack if nobody is
+// subscribed; nothing is buffered.
+static void bleNotifyEvent(uint16_t jumpId, bool landing, uint8_t stage, uint32_t timeMs,
+                           const EventInfo& info) {
+  uint8_t payload[EVENT_FIXED_BYTES + EVENT_EXTRAS_MAX];
+  payload[0] = PROTOCOL_VERSION;
+  payload[1] = (uint8_t)jumpId;
+  payload[2] = (uint8_t)(jumpId >> 8);
+  payload[3] = (uint8_t)((landing ? 1 : 0) | (stage << 1));
+  putU32LE(payload + 4, timeMs);
+  payload[8] = info.confidence;
+  payload[9] = info.reasons;
+  const uint8_t n = info.extrasLen <= EVENT_EXTRAS_MAX ? info.extrasLen : EVENT_EXTRAS_MAX;
+  memcpy(payload + EVENT_FIXED_BYTES, info.extras, n);
+  eventChar.writeValue(payload, EVENT_FIXED_BYTES + n);
+  if (!eventChar.subscribed()) {
     // The algorithm IS detecting jumps; they just aren't reaching a phone. Usually: no app
     // connected yet, or connected but hasn't enabled notifications on this characteristic.
-    LOG(String(label) + ": no app subscribed, notification dropped");
+    LOG("event: no app subscribed, notification dropped");
   }
 }
 
-static void bleNotifyLanding(uint32_t flightMs) {
-  notifyEvent("landing", landingChar, flightMs, landingSeq++);
+// Info = {proto, boot count, current device time}; refreshed right before every read.
+static void updateInfo() {
+  uint8_t v[INFO_BYTES];
+  v[0] = PROTOCOL_VERSION;
+  v[1] = (uint8_t)bootCount;
+  v[2] = (uint8_t)(bootCount >> 8);
+  putU32LE(v + 3, (uint32_t)(micros64() / 1000ULL));
+  infoChar.writeValue(v, sizeof(v));
 }
-static void bleNotifyTakeoff(uint32_t contactMs) {
-  notifyEvent("takeoff", takeoffChar, contactMs, takeoffSeq++);
+
+static void onInfoRead(BLEDevice central, BLECharacteristic characteristic) {
+  (void)central;
+  (void)characteristic;
+  updateInfo();
+}
+
+// Publishes an algorithm description string, cut to META_MAX_BYTES.
+static void setMetaString(BLECharacteristic& c, const char* label, const char* text) {
+  size_t len = strlen(text);
+  if (len > (size_t)META_MAX_BYTES) {
+    LOG(String(label) + " is longer than 512 bytes, truncated");
+    len = META_MAX_BYTES;
+  }
+  // With the default MTU a long read fetches 22-byte pieces. ArduinoBLE answers a read at
+  // offset == length with an error instead of an empty value, which can fail the whole long
+  // read when the length is an exact multiple of 22, so pad with a (JSON-neutral) space.
+  static uint8_t buf[META_MAX_BYTES];
+  memcpy(buf, text, len);
+  if (len > 0 && len % 22 == 0 && len < (size_t)META_MAX_BYTES) buf[len++] = ' ';
+  c.writeValue(buf, len);
 }
 
 static void bleSetBatteryLevel(uint8_t percent) { batteryLevelChar.writeValue(percent); }
@@ -109,10 +157,11 @@ static void onDisconnected(BLEDevice central) {
 }
 
 // Starts the BLE stack and registers all services. Call after loadDeviceName().
-// `algorithmName` (the active jump detector) is published as the Software Revision String,
-// cut to DIS_STRING_MAX bytes. Returns false if the stack fails to start.
+// `algorithm` (the active jump detector or the demo) is described over BLE: its name as the
+// Software Revision String (cut to DIS_STRING_MAX bytes), its field/reason/confidence strings in
+// the Fields, Reasons and Confidence kind characteristics. Returns false if the stack fails to start.
 // Advertising starts with bleStartAdvertising().
-static bool bleBegin(const char* algorithmName) {
+static bool bleBegin(const TransitionSource& algorithm) {
   if (!BLE.begin()) return false;
   BLE.setLocalName(deviceName);
   BLE.setDeviceName(deviceName);
@@ -122,12 +171,18 @@ static bool bleBegin(const char* algorithmName) {
   BLE.setConnectionInterval(BLE_CONN_INTERVAL_MIN, BLE_CONN_INTERVAL_MAX);
 
   // Descriptors must be attached before the service is added.
-  landingChar.addDescriptor(landingDescription);
-  takeoffChar.addDescriptor(takeoffDescription);
+  eventChar.addDescriptor(eventDescription);
+  infoChar.addDescriptor(infoDescription);
+  fieldsChar.addDescriptor(fieldsDescription);
+  reasonsChar.addDescriptor(reasonsDescription);
+  confidenceKindChar.addDescriptor(confidenceKindDescription);
   nameChar.addDescriptor(nameDescription);
 
-  jumpService.addCharacteristic(landingChar);
-  jumpService.addCharacteristic(takeoffChar);
+  jumpService.addCharacteristic(eventChar);
+  jumpService.addCharacteristic(infoChar);
+  jumpService.addCharacteristic(fieldsChar);
+  jumpService.addCharacteristic(reasonsChar);
+  jumpService.addCharacteristic(confidenceKindChar);
   jumpService.addCharacteristic(nameChar);
   batteryService.addCharacteristic(batteryLevelChar);
   deviceInfoService.addCharacteristic(manufacturerNameChar);
@@ -142,13 +197,18 @@ static bool bleBegin(const char* algorithmName) {
 
   nameChar.writeValue((const uint8_t*)deviceName, strlen(deviceName));
   nameChar.setEventHandler(BLEWritten, onNameWritten);
+  updateInfo();
+  infoChar.setEventHandler(BLERead, onInfoRead);
+  setMetaString(fieldsChar, "fieldsJson()", algorithm.fieldsJson());
+  setMetaString(reasonsChar, "reasonsJson()", algorithm.reasonsJson());
+  setMetaString(confidenceKindChar, "confidenceKind()", algorithm.confidenceKind());
 
   manufacturerNameChar.writeValue(MANUFACTURER_NAME);
   modelNumberChar.writeValue(MODEL_NUMBER);
   serialNumberChar.writeValue(BLE.address());  // BLE device address: unique per chip
   hardwareRevisionChar.writeValue(HARDWARE_REVISION);
   firmwareRevisionChar.writeValue(FIRMWARE_VERSION);
-  softwareRevisionChar.writeValue(String(algorithmName).substring(0, DIS_STRING_MAX));
+  softwareRevisionChar.writeValue(String(algorithm.name()).substring(0, DIS_STRING_MAX));
 
   BLE.setEventHandler(BLEConnected, onConnected);
   BLE.setEventHandler(BLEDisconnected, onDisconnected);

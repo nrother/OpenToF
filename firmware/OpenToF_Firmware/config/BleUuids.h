@@ -3,26 +3,41 @@
 #pragma once
 
 // ============================================================================
-// OpenToF custom protocol
-// !! These four 128-bit UUIDs are PLACEHOLDERS until agreed with the app team.
+// OpenToF custom protocol, version 1 (PROTOCOL_VERSION)
+// !! The 128-bit UUIDs are PLACEHOLDERS until agreed with the app team.
 // ============================================================================
 //   Jump service   (advertised; the app scans for it)
-//     Landing  Notify      flight_time_ms  uint32, sequence_number uint32
-//     Takeoff  Notify      contact_time_ms uint32, sequence_number uint32
-//     Name     Read/Write  UTF-8, 1..NAME_MAX_BYTES bytes, stored in flash
+//     Event            Notify      one takeoff/landing event, layout below
+//     Info             Read        proto u8, boot_count u16, device_time_ms u32 (fresh per read)
+//     Fields           Read        JSON array describing the event's custom fields
+//     Reasons          Read        JSON array naming the reason bits
+//     Confidence kind  Read        "none" | "heuristic" | "calibrated"
+//     Name             Read/Write  UTF-8, 1..NAME_MAX_BYTES bytes, stored in flash
+//   The algorithm's name stays in the Device Information service (Software Revision String).
+//   Removed in protocol 1: Landing (...0002...) and Takeoff (...0003...); do not reuse them.
 //
-// Event semantics
-//   Contact time is the one BEFORE a jump (previous landing -> this takeoff), so a takeoff
-//   event (carrying that contact time) is sent when the takeoff happens, before the landing
-//   event of the same jump. Each characteristic has its own sequence counter that increments
-//   for every event, even when no phone is connected, so the app can detect missed events.
-//   The very first takeoff after boot has no preceding landing: no takeoff event is sent
-//   (no counter consumed) and the app shows that contact time as unknown.
+// Event layout (10 bytes + 0..EVENT_EXTRAS_MAX bytes of custom fields)
+//   [0]     proto       u8   PROTOCOL_VERSION
+//   [1..2]  jump_id     u16  +1 per new jump (wraps); takeoff and landing of a jump share it
+//   [3]     kind        u8   bit 0: 0 = takeoff, 1 = landing
+//                            bits 1..2: 0 = provisional, 1 = final, 2 = retracted
+//   [4..7]  t_ms        u32  event time, ms since boot (0 for a retraction)
+//   [8]     confidence  u8   0..100, 255 = not provided
+//   [9]     reasons     u8   bitmask, names in the Reasons characteristic
+//   [10..]  extras           custom fields, described by the Fields characteristic
+// Rules (enforced in core/JumpEventPublisher.h): a provisional event may be followed by its
+// final or a retraction; a retracted takeoff voids the jump, after a retracted landing a new
+// landing for the same jump may follow. Nothing is buffered while no app is connected.
+
+#define PROTOCOL_VERSION 1
 
 #define UUID_JUMP_SERVICE "6f70656e-546f-4600-0001-000000000000"
-#define UUID_LANDING "6f70656e-546f-4600-0002-000000000000"
-#define UUID_TAKEOFF "6f70656e-546f-4600-0003-000000000000"
 #define UUID_NAME "6f70656e-546f-4600-0004-000000000000"
+#define UUID_EVENT "6f70656e-546f-4600-0005-000000000000"
+#define UUID_INFO "6f70656e-546f-4600-0006-000000000000"
+#define UUID_FIELDS "6f70656e-546f-4600-0007-000000000000"
+#define UUID_REASONS "6f70656e-546f-4600-0008-000000000000"
+#define UUID_CONFIDENCE_KIND "6f70656e-546f-4600-0009-000000000000"
 
 // Human-readable descriptions of the custom characteristics. They are sent as GATT
 // "Characteristic User Description" descriptors (0x2901), which scanner apps such as
@@ -30,8 +45,11 @@
 // A service cannot carry a description; the standard characteristics need none because
 // scanners know their names.
 #define SIG_DESC_USER_DESCRIPTION "2901"
-#define DESC_LANDING "Landing: flight time [ms] u32, seq u32"
-#define DESC_TAKEOFF "Takeoff: contact time [ms] u32, seq u32"
+#define DESC_EVENT "Takeoff/landing event (proto 1)"
+#define DESC_INFO "proto u8, boot count u16, time ms u32"
+#define DESC_FIELDS "Custom event fields (JSON)"
+#define DESC_REASONS "Reason bit names (JSON)"
+#define DESC_CONFIDENCE_KIND "Confidence kind"
 #define DESC_NAME "Device name (UTF-8, writable)"
 
 // ============================================================================

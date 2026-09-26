@@ -2,7 +2,7 @@ name: opentof_app
 description: "OpenToF companion app for trampoline time-of-flight sensor"
 publish_to: 'none'
 
-version: 1.1.0+2
+version: 0.4.0+3
 
 environment:
   sdk: ^3.13.4
@@ -35,8 +35,10 @@ flutter:
   generate: true
   assets:
     - assets/sounds/
-    - assets/images/OpenToF_logo_wordmark.png
+    - assets/images/OpenToF_wordmark.png
+    - assets/images/OpenToF_wordmark_dark.png
     - assets/images/OpenToF_mark.png
+    - assets/images/OpenToF_mark_dark.png
 
 # Branding (see tool/generate_branding.ps1). Regenerate native files with:
 #   dart run flutter_launcher_icons
@@ -52,10 +54,12 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#FFFFFF"
-  color_dark: "#121318" # dark surface of the app theme (seed #0052EE)
+  color_dark: "#121318" # dark surface of the app theme (seed #0153E3)
   image: assets/branding/splash_logo.png
+  image_dark: assets/branding/splash_logo_dark.png
   android_12:
     image: assets/branding/splash_android12.png
+    image_dark: assets/branding/splash_android12_dark.png
     color: "#FFFFFF"
     color_dark: "#121318"
     icon_background_color: "#FFFFFF"

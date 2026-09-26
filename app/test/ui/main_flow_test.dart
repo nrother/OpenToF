@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opentof_app/domain/chart_event.dart';
+import 'package:opentof_app/domain/sensor_events.dart';
 import 'package:opentof_app/state/providers.dart';
 import 'package:opentof_app/ui/main/jump_chart.dart';
 
 import 'harness.dart';
+
+ProviderContainer container(WidgetTester tester) =>
+    ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
 
 void main() {
   testWidgets(
@@ -63,6 +67,10 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.ios_share));
     await tester.pump();
+    await h.advance(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Recorded routine'));
+    await tester.pump();
+    await h.advance(const Duration(milliseconds: 600));
     expect(h.export.shared.single.jumps.length, 10);
   });
 
@@ -134,9 +142,217 @@ void main() {
     await tester.tap(h.startButton);
     await tester.pump();
 
-    h.mock.dropNextLanding();
+    h.mock.dropNextJump();
     await h.jump();
     expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+  });
+
+  testWidgets('a provisional landing counts and beeps; the final value '
+      'replaces it', (tester) async {
+    final h = await AppHarness.launch(tester);
+    await h.jump();
+    await tester.tap(h.startButton);
+    await tester.pump();
+    final beepsAfterStart = h.audio.jumpBeeps;
+
+    h.mock.emitTakeoff(contactMs: 200);
+    h.mock.emitLanding(flightMs: 1111, stage: JumpEventStage.provisional);
+    await h.advance(const Duration(milliseconds: 50));
+    expect(find.text('Jump 2 of 10'), findsOneWidget);
+    expect(h.audio.jumpBeeps, beepsAfterStart + 1);
+    expect(container(tester).read(sessionProvider).lastJump!.isFinal, isFalse);
+
+    // Final landing 11 ms earlier than the provisional estimate.
+    h.mock.emitLanding(flightMs: 1100);
+    await h.advance(const Duration(milliseconds: 50));
+    final s = container(tester).read(sessionProvider);
+    expect(s.lastJump!.flightMs, 1100);
+    expect(s.lastJump!.isFinal, isTrue);
+    expect(s.routine.jumps.last.flightMs, 1100);
+    expect(s.history.last.flightMs, 1100);
+    expect(s.routine.jumps, hasLength(2));
+    expect(h.audio.jumpBeeps, beepsAfterStart + 1); // no second beep
+    expect(find.text('1.100 s'), findsWidgets);
+  });
+
+  testWidgets('a retracted landing removes the jump again', (tester) async {
+    final h = await AppHarness.launch(tester);
+    await h.jump(flightMs: 1234);
+    await tester.tap(h.startButton);
+    await tester.pump();
+
+    h.mock.emitTakeoff(contactMs: 200);
+    h.mock.emitLanding(flightMs: 500, stage: JumpEventStage.provisional);
+    await h.advance(const Duration(milliseconds: 50));
+    expect(find.text('Jump 2 of 10'), findsOneWidget);
+
+    h.mock.retractLanding();
+    await h.advance(const Duration(milliseconds: 50));
+    final s = container(tester).read(sessionProvider);
+    expect(s.routine.jumps, hasLength(1));
+    expect(s.history, hasLength(1));
+    expect(s.lastJump!.flightMs, 1234);
+    expect(find.text('Jump 1 of 10'), findsOneWidget);
+  });
+
+  testWidgets('time on bed and total time show when enabled', (tester) async {
+    final h = await AppHarness.launch(
+      tester,
+      prefs: {'show_contact_time': true, 'show_total_time': true},
+    );
+    await h.jump(flightMs: 1000); // first jump: no previous landing
+    expect(find.text('Bed: –   Bed+Flight: –'), findsOneWidget);
+    await h.jump(flightMs: 1100); // harness uses 200 ms on the bed
+    expect(find.text('Bed: 0.200 s   Bed+Flight: 1.300 s'), findsOneWidget);
+
+    await tester.tap(h.startButton);
+    await tester.pump();
+    expect(find.text('Bed (s)'), findsOneWidget);
+    expect(find.text('Bed+Flight (s)'), findsOneWidget);
+    expect(find.text('1.300'), findsOneWidget); // table cell, unit in header
+  });
+
+  testWidgets('all table columns fit a narrow phone (German)', (tester) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('de')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    final h = await AppHarness.launch(
+      tester,
+      prefs: {'show_contact_time': true, 'show_total_time': true},
+    );
+    tester.view.physicalSize = const Size(360, 3000);
+    await h.jump(flightMs: 2345);
+    await h.jump(flightMs: 2345);
+    await tester.tap(find.text('Routine starten'));
+    await tester.pump();
+    for (var i = 0; i < 9; i++) {
+      await h.jump(flightMs: 2345);
+    }
+    // A RenderFlex overflow would have failed the test by now.
+    expect(find.text('Tuch+Flug (s)'), findsOneWidget);
+  });
+
+  group('more jump details', () {
+    const on = {'show_jump_details': true};
+
+    testWidgets('grey line under the last jump shows the chosen values', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(
+        tester,
+        prefs: {
+          ...on,
+          'hidden_jump_details': ['pi'],
+        },
+      );
+      await h.jump();
+      final line = find.textContaining('Confidence 90 %');
+      expect(line, findsOneWidget);
+      final text = tester.widget<Text>(line).data!;
+      expect(text, contains('Landing intensity'));
+      expect(text, isNot(contains('Push-off intensity')));
+    });
+
+    testWidgets('off by default: no line, no tap sheet', (tester) async {
+      final h = await AppHarness.launch(tester);
+      await h.jump();
+      expect(find.textContaining('Confidence'), findsNothing);
+      await tester.tap(find.text('1.000 s'));
+      await tester.pump();
+      await h.advance(const Duration(milliseconds: 600));
+      expect(find.text('Jump details'), findsNothing);
+    });
+
+    testWidgets('tapping the last jump, a table row or a bar opens details', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(tester, prefs: on);
+      await h.jump(flightMs: 1234);
+
+      Future<void> expectSheet() async {
+        await tester.pump();
+        await h.advance(const Duration(milliseconds: 600));
+        expect(find.text('Jump details'), findsOneWidget);
+        expect(find.text('Final'), findsOneWidget);
+        await tester.tapAt(const Offset(10, 10)); // outside: close
+        await tester.pump();
+        await h.advance(const Duration(milliseconds: 600));
+        expect(find.text('Jump details'), findsNothing);
+      }
+
+      await tester.tap(find.text('1.234 s'));
+      await expectSheet();
+
+      final chart = tester.getRect(find.byType(JumpChart));
+      await tester.tapAt(Offset(chart.right - 9, chart.center.dy));
+      await expectSheet();
+
+      await tester.tap(h.startButton);
+      await tester.pump();
+      expect(find.text('Confidence (%)'), findsOneWidget); // table column
+      await tester.tap(find.text('1.234').first); // row 1 (last = total row)
+      await expectSheet();
+    });
+
+    testWidgets('many columns scroll sideways instead of overflowing', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(
+        tester,
+        prefs: {...on, 'show_contact_time': true, 'show_total_time': true},
+      );
+      tester.view.physicalSize = const Size(360, 3000);
+      await h.jump();
+      await h.jump();
+      await tester.tap(h.startButton);
+      await tester.pump();
+      await h.jump();
+      expect(
+        find.ancestor(
+          of: find.text('Landing intensity'),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  testWidgets('export: last N seconds or the recorded routine', (tester) async {
+    final h = await AppHarness.launch(tester);
+    await h.jump();
+    await h.advance(const Duration(seconds: 40));
+    await h.jump();
+
+    await tester.tap(find.byIcon(Icons.ios_share));
+    await tester.pump();
+    await h.advance(const Duration(milliseconds: 600));
+    expect(find.text('Export as CSV'), findsOneWidget);
+    expect(find.text('1 jump'), findsOneWidget); // last 30 s
+    expect(find.text('2 jumps'), findsNWidgets(2)); // last 1 min, 5 min
+    // No routine recorded yet: its entry is disabled.
+    expect(
+      tester
+          .widget<ListTile>(find.widgetWithText(ListTile, 'Recorded routine'))
+          .enabled,
+      isFalse,
+    );
+
+    await tester.tap(find.text('Last 1 min'));
+    await tester.pump();
+    await h.advance(const Duration(milliseconds: 600));
+    expect(h.export.sharedJumps.single, hasLength(2));
+    expect(h.export.shared, isEmpty);
+  });
+
+  testWidgets('an uncertain jump is marked in the routine table', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await h.jump();
+    await tester.tap(h.startButton);
+    await tester.pump();
+    h.mock.emitJump(confidence: 30, reasons: 1);
+    await h.advance(const Duration(milliseconds: 100));
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
   });
 
   testWidgets('beep toggles: per-jump off keeps the final sound', (
@@ -229,9 +445,6 @@ void main() {
   });
 
   group('chart pause and event markers', () {
-    ProviderContainer container(WidgetTester tester) =>
-        ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
-
     // The axis labels are painted, not Text widgets: read them off the chart.
     String chartLabel(WidgetTester tester) =>
         tester.widget<JumpChart>(find.byType(JumpChart)).nowLabel;
@@ -313,6 +526,143 @@ void main() {
       final s = container(tester).read(sessionProvider);
       expect(s.events, isEmpty);
       expect(s.chartFrozenAt, isNotNull); // Clear does not resume
+    });
+
+    testWidgets('starting and finishing a routine marks start and stop', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(
+        tester,
+        prefs: {'jumps_per_routine': 2},
+      );
+      List<ChartEventType> types() =>
+          container(tester)
+              .read(sessionProvider)
+              .events
+              .map((e) => e.type)
+              .toList();
+
+      await h.jump();
+      await tester.tap(h.startButton);
+      // The chart legend keys off a 250 ms periodic "now" ticker; advance
+      // enough to guarantee it has caught up (not just tester.pump()).
+      await h.advance(const Duration(milliseconds: 300));
+      expect(types(), [
+        ChartEventType.connected,
+        ChartEventType.routineStarted,
+      ]);
+      expect(find.text('Routine started'), findsOneWidget);
+
+      await h.jump();
+      await h.advance(const Duration(milliseconds: 300));
+      expect(types(), [
+        ChartEventType.connected,
+        ChartEventType.routineStarted,
+        ChartEventType.routineStopped,
+      ]);
+      expect(find.text('Routine stopped'), findsOneWidget);
+    });
+
+    testWidgets('cancelling (by button or inactivity) also marks stop', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(tester);
+      List<ChartEventType> types() =>
+          container(tester)
+              .read(sessionProvider)
+              .events
+              .map((e) => e.type)
+              .toList();
+
+      await h.jump();
+      await tester.tap(h.startButton);
+      await tester.pump();
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      expect(types(), [
+        ChartEventType.connected,
+        ChartEventType.routineStarted,
+        ChartEventType.routineStopped,
+      ]);
+
+      await h.jump(); // fresh jump, eligible to start again
+      await tester.tap(h.startButton);
+      await tester.pump();
+      await h.advance(const Duration(seconds: 5)); // default 4 s timeout
+      expect(types(), [
+        ChartEventType.connected,
+        ChartEventType.routineStarted,
+        ChartEventType.routineStopped,
+        ChartEventType.routineStarted,
+        ChartEventType.routineStopped,
+      ]);
+    });
+
+    testWidgets('a 1-jump routine marks both start and stop at once', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(
+        tester,
+        prefs: {'jumps_per_routine': 1},
+      );
+      await h.jump();
+      await tester.tap(h.startButton);
+      await tester.pump();
+      expect(
+        container(tester).read(sessionProvider).events.map((e) => e.type),
+        [
+          ChartEventType.connected,
+          ChartEventType.routineStarted,
+          ChartEventType.routineStopped,
+        ],
+      );
+    });
+
+    testWidgets(
+      'an implausibly long jump is excluded but marked on the chart',
+      (tester) async {
+        final h = await AppHarness.launch(tester);
+        await h.jump(flightMs: 1234);
+        expect(find.text('1.234 s'), findsOneWidget);
+
+        h.mock.emitJump(flightMs: 2600, contactMs: 200);
+        // The chart legend keys off a 250 ms periodic "now" ticker; advance
+        // enough to guarantee it has caught up.
+        await h.advance(const Duration(milliseconds: 300));
+
+        // The last-jump display is unchanged: the implausible one never became "last".
+        expect(find.text('1.234 s'), findsOneWidget);
+        expect(find.text('2.600 s'), findsNothing);
+
+        final s = container(tester).read(sessionProvider);
+        expect(s.lastJump!.flightMs, 1234);
+        expect(s.history.length, 1);
+        expect(s.events.map((e) => e.type), [
+          ChartEventType.connected,
+          ChartEventType.implausibleJump,
+        ]);
+        expect(find.text('Implausible jump (ignored)'), findsOneWidget);
+      },
+    );
+
+    testWidgets('an implausible jump does not count toward the routine', (
+      tester,
+    ) async {
+      final h = await AppHarness.launch(
+        tester,
+        prefs: {'jumps_per_routine': 2},
+      );
+      await h.jump();
+      await tester.tap(h.startButton);
+      await tester.pump();
+      expect(find.text('Jump 1 of 2'), findsOneWidget);
+
+      h.mock.emitJump(flightMs: 2600, contactMs: 200);
+      await h.advance(const Duration(milliseconds: 100));
+      expect(find.text('Jump 1 of 2'), findsOneWidget); // still waiting for #2
+
+      await h.jump();
+      expect(find.text('Routine complete'), findsOneWidget);
     });
   });
 }

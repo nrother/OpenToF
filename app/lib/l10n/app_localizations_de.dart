@@ -102,6 +102,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get chartPaused => 'pausiert';
 
   @override
+  String get chartRoutineStarted => 'Routine gestartet';
+
+  @override
+  String get chartRoutineStopped => 'Routine beendet';
+
+  @override
+  String get chartImplausibleJump => 'Unplausibler Sprung (ignoriert)';
+
+  @override
   String get pauseChart => 'Pause';
 
   @override
@@ -348,11 +357,159 @@ class AppLocalizationsDe extends AppLocalizations {
   String get simSingleJump => 'Einzelner Sprung';
 
   @override
-  String get simDropLanding => 'Nächste Landung verlieren';
+  String get simDropJump => 'Nächsten Sprung verlieren';
 
   @override
   String get simDisconnect => 'Trennung simulieren';
 
   @override
   String get simReconnect => 'Wiederverbindung simulieren';
+
+  @override
+  String get uncertainJumpWarning =>
+      'Der Sensor ist sich bei diesem Sprung unsicher';
+
+  @override
+  String confidenceValue(int value) {
+    return 'Konfidenz: $value %';
+  }
+
+  @override
+  String get versionMismatchTitle => 'Sensor-Firmware passt nicht zur App';
+
+  @override
+  String versionMismatchBody(String app, String firmware) {
+    return 'App $app, Sensor-Firmware $firmware. Bitte die ältere Version aktualisieren, sonst kommen Sprünge evtl. nicht an.';
+  }
+
+  @override
+  String get sensorDetails => 'Sensor-Details';
+
+  @override
+  String get algorithmSection => 'Erkennungsalgorithmus';
+
+  @override
+  String get protocolVersionLabel => 'Protokollversion';
+
+  @override
+  String get bootCountLabel => 'Sensor-Starts';
+
+  @override
+  String get confidenceKindLabel => 'Konfidenz';
+
+  @override
+  String get confidenceKindNone => 'Nicht angegeben';
+
+  @override
+  String get confidenceKindHeuristic => 'Schätzung (höher = zuverlässiger)';
+
+  @override
+  String get confidenceKindCalibrated => 'Kalibrierte Wahrscheinlichkeit';
+
+  @override
+  String get reasonsLabel => 'Gründe für Unsicherheit';
+
+  @override
+  String get customFieldsLabel => 'Zusatzwerte pro Sprung';
+
+  @override
+  String get noneProvided => 'Keine';
+
+  @override
+  String get fieldOnTakeoff => 'beim Absprung';
+
+  @override
+  String get fieldOnLanding => 'bei der Landung';
+
+  @override
+  String get fieldOnBoth => 'bei Absprung und Landung';
+
+  @override
+  String get fieldRelative => 'relative Werte';
+
+  @override
+  String get displaySection => 'Sprunganzeige';
+
+  @override
+  String get showContactTime => 'Zeit auf dem Tuch anzeigen';
+
+  @override
+  String get showContactTimeHelp => 'Kontaktzeit vor jedem Sprung';
+
+  @override
+  String get showTotalTime => 'Gesamte Sprungzeit anzeigen';
+
+  @override
+  String get showTotalTimeHelp => 'Zeit auf dem Tuch + Flugzeit';
+
+  @override
+  String get contactLabel => 'Tuch';
+
+  @override
+  String get totalTimeLabel => 'Tuch+Flug';
+
+  @override
+  String columnSeconds(String label) {
+    return '$label (s)';
+  }
+
+  @override
+  String get exportChooserTitle => 'Als CSV exportieren';
+
+  @override
+  String get exportRoutine => 'Aufgezeichnete Routine';
+
+  @override
+  String exportLastWindow(String window) {
+    return 'Letzte $window';
+  }
+
+  @override
+  String jumpCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Sprünge',
+      one: '1 Sprung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showJumpDetails => 'Mehr Sprungdetails anzeigen';
+
+  @override
+  String get showJumpDetailsHelp =>
+      'Zusatzwerte des Sensors unter dem letzten Sprung und in der Routine-Tabelle. Sprung antippen für alle Details.';
+
+  @override
+  String get detailsToShow => 'Angezeigte Werte';
+
+  @override
+  String get detailsNoSensorValues =>
+      'Sensor verbinden, um zu sehen, welche Werte er liefert.';
+
+  @override
+  String get jumpDetailsTitle => 'Sprungdetails';
+
+  @override
+  String get landedAtLabel => 'Gelandet um';
+
+  @override
+  String get flightTimeLabel => 'Flugzeit';
+
+  @override
+  String get contactTimeLabel => 'Zeit auf dem Tuch';
+
+  @override
+  String get totalJumpTimeLabel => 'Gesamtzeit (Tuch + Flug)';
+
+  @override
+  String get stageLabel => 'Status';
+
+  @override
+  String get stageFinal => 'Endgültig';
+
+  @override
+  String get stageProvisional => 'Vorläufig (erste Schätzung des Sensors)';
 }
