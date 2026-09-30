@@ -20,10 +20,6 @@
 constexpr int IMU_I2C_ADDR = 0x6A;
 LSM6DS3Core imu(I2C_MODE, IMU_I2C_ADDR);
 
-bool no_wakeup = false;
-bool who_am_i_failed = false;
-bool wakeup_seen = false;
-
 // This functions run just before main(). The CRT is stable, we have a stack,
 // but sl_system_init() has not been called, so only emlib is available, no RTOS
 // or high-level drivers.
@@ -34,7 +30,6 @@ void __attribute__((constructor)) before_main() {
   if ((rstCause & EMU_RSTCAUSE_EM4) == 0) {
     // not EM4 wakeup -> unlatch pins and do normal startup
     EMU_UnlatchPinRetention();
-    no_wakeup = true;
     return;
   }
 
@@ -50,7 +45,6 @@ void __attribute__((constructor)) before_main() {
   uint8_t who_am_i = read_imu_register_early(0x0F);
   if (who_am_i != 0x6A) {
     // something is broken, continue with normal startup
-    who_am_i_failed = true;
     return;
   }
 
@@ -59,7 +53,6 @@ void __attribute__((constructor)) before_main() {
   bool wakeupDetected = (wakeupSrc_reg & 0x08) != 0;
   if (wakeupDetected) {
     // we saw motion, time to wake up. Continue normal startup
-    wakeup_seen = true;
     return;
   }
 
@@ -72,7 +65,6 @@ void restore_gpio(void) {
 
   // restore GPIO config:
   GPIO_PinModeSet(gpioPortD, 5, gpioModePushPull, 1);  // PD5 = output high -> enable IMU power
-  GPIO_PinModeSet(gpioPortA, 7, gpioModePushPull, 0);  // PA7 = output low -> enable LED (test)
 
   // unlatch GPIOs
   EMU_UnlatchPinRetention();
@@ -136,7 +128,6 @@ void deepSleepLatch(uint32_t millis) {
 
   EMU_EM4Init_TypeDef em4_init = EMU_EM4INIT_DEFAULT;
 
-  // em4_init.pinRetentionMode = emuPinRetentionEm4Exit;// will disable LED on boot
   em4_init.pinRetentionMode = emuPinRetentionLatch;
 
   EMU_EM4Init(&em4_init);
@@ -144,25 +135,33 @@ void deepSleepLatch(uint32_t millis) {
 }
 
 void setup() {
-  // do normal startup, either hard-reset or motion was detected
   Serial.begin(115200);
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
   Serial.println("Deep sleep with external or timed wakeup");
-  Serial.print("Flags: no_wakup: ");
-  Serial.print(no_wakeup);
-  Serial.print("who_am_i_failed: ");
-  Serial.print(who_am_i_failed);
-  Serial.print("wakeup_seen: ");
-  Serial.print(wakeup_seen);
-  Serial.println();
   if (LowPower.wokeUpFromDeepSleep()) {
     Serial.println("Woke up from deep sleep");
-    check_wakeup_late();
+    check_wakeup_late(); // will not return if no motion detected
   } else {
     Serial.println("Other wakeup cause");
+    configure_imu();
   }
 
+  // do normal startup, either hard-reset or motion was detected
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+
+  for (int i = 0; i < 10; i++) {
+    Serial.print("Awake...");
+    Serial.println(10 - i);
+    delay(1000);
+  }
+
+  Serial.println("Going to sleep for 3 sec...");
+  digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+  deepSleepLatch(3000);
+}
+
+void configure_imu(void) {
+  // completely regconfigure the IMU after full boot
   if (imu.beginCore() != IMU_SUCCESS) {
     Serial.println("IMU init failed!");
     while (1)
@@ -176,26 +175,15 @@ void setup() {
   imu.writeRegister(0x5C, 0x3F);  // WAKE_UP_THS threshold (max)
   imu.writeRegister(0x5E, 0x20);  // MD1_CFG = wakup on INT1 (pin is not connected, but required for lateched mode!)
   imu.writeRegister(0x58, 0x81);  // TAP_CFG = basic function (wakeup) enabled, latched interupt mode
-
-  for (int i = 0; i < 10; i++) {
-    Serial.print("Awake...");
-    Serial.println(10 - i);
-    delay(1000);
-  }
-
-  uint8_t wakeupSrc_reg;
-  imu.readRegister(&wakeupSrc_reg, 0x1B);
-  bool wakeupDetected = (wakeupSrc_reg & 0x08) != 0;
-  if (wakeupDetected) {
-    Serial.println("MOTION!!!!!!!");
-  }
-
-  Serial.println("Going to sleep for 3 sec...");
-  deepSleepLatch(3000);
 }
 
 void check_wakeup_late(void) {
-  imu.beginCore();
+  // IMU power is still on
+  // we cannot call imu.beginCore() here because this will call pinMode(PD5, OUTPUT)
+  // which briefly glitches the pin to LOW, causing the IMU to reset and the flag
+  // we are interested. appart from that, imu.beginCore() only calls Wire1.begin()
+  // so we emulate that here
+  Wire1.begin();
 
   // read who am I
   uint8_t whoami_reg;
@@ -209,8 +197,7 @@ void check_wakeup_late(void) {
   bool wakeupDetected = (wakeupSrc_reg & 0x08) != 0;
   if (wakeupDetected) {
     // we saw motion, time to wake up. Continue normal startup
-    wakeup_seen = true;
-    Serial.println("MOTION!!!!!!!"); // this is never triggered. Maybe the IMU is somehow reset in deep sleep?
+    Serial.println("MOTION!!!!!!!");
     return;
   }
 
