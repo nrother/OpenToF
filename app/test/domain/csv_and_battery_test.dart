@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opentof_app/domain/battery_estimator.dart';
+import 'package:opentof_app/domain/chart_event.dart';
 import 'package:opentof_app/domain/csv_exporter.dart';
 import 'package:opentof_app/domain/jump.dart';
 import 'package:opentof_app/domain/routine.dart';
@@ -8,7 +9,7 @@ final t0 = DateTime(2026, 1, 1, 12);
 
 void main() {
   group('CsvExporter', () {
-    test('rows, empty unknown contact, missed flag and total footer', () {
+    test('rows, empty unknown contact and missed flag, no footer', () {
       final state = RoutineState(
         phase: RoutinePhase.complete,
         jumps: [
@@ -24,8 +25,32 @@ void main() {
       );
       expect(csv[1], '1,1.200,0.200,1.400,1.766,0,0,,');
       expect(csv[2], '2,1.500,,,2.759,1,0,,');
-      expect(csv[3], 'total,2.700,,,,1,,,');
-      expect(csv[4], ''); // trailing CRLF
+      expect(csv[3], ''); // trailing CRLF
+    });
+
+    test('routine start/stop markers interleave with jumps by time', () {
+      final jumps = [
+        Jump(flightMs: 1200, landedAt: t0.add(const Duration(seconds: 1))),
+        Jump(flightMs: 1000, landedAt: t0.add(const Duration(seconds: 3))),
+      ];
+      final events = [
+        ChartEvent(at: t0, type: ChartEventType.routineStarted),
+        ChartEvent(
+          at: t0.add(const Duration(seconds: 4)),
+          type: ChartEventType.routineStopped,
+        ),
+        // Non-routine events are ignored in the export.
+        ChartEvent(
+          at: t0.add(const Duration(seconds: 2)),
+          type: ChartEventType.disconnected,
+        ),
+      ];
+      final csv = CsvExporter.buildJumps(jumps, events: events).split('\r\n');
+      expect(csv[1], 'routine_start,,,,,,,,');
+      expect(csv[2], '1,1.200,,,1.766,0,0,,');
+      expect(csv[3], '2,1.000,,,1.226,0,0,,');
+      expect(csv[4], 'routine_stop,,,,,,,,');
+      expect(csv[5], ''); // trailing CRLF
     });
 
     test('confidence, reasons and one column per custom field', () {
@@ -58,7 +83,7 @@ void main() {
         '1,1.200,,,1.766,0,0,40,"weak push; say ""hi"", twice",143,0.250',
       );
       expect(csv[2], '2,1.000,,,1.226,0,1,,,90,');
-      expect(csv[3], 'total,2.200,,,,0,,,,,');
+      expect(csv[3], ''); // trailing CRLF
     });
 
     test('file name is timestamped', () {

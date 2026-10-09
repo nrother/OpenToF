@@ -5,6 +5,7 @@ import 'package:opentof_app/app.dart';
 import 'package:opentof_app/data/audio_service.dart';
 import 'package:opentof_app/data/export_service.dart';
 import 'package:opentof_app/data/sensor/mock_sensor.dart';
+import 'package:opentof_app/domain/chart_event.dart';
 import 'package:opentof_app/domain/jump.dart';
 import 'package:opentof_app/domain/routine.dart';
 import 'package:opentof_app/state/providers.dart';
@@ -31,8 +32,11 @@ class FakeExport implements ExportService {
       shared.add(routine);
 
   @override
-  Future<void> shareJumps(List<Jump> jumps, {DateTime? now}) async =>
-      sharedJumps.add(jumps);
+  Future<void> shareJumps(
+    List<Jump> jumps, {
+    List<ChartEvent> events = const [],
+    DateTime? now,
+  }) async => sharedJumps.add(jumps);
 }
 
 /// Running app wired to a MockSensor, a manually advanced clock and fakes.
@@ -76,7 +80,7 @@ class AppHarness {
     WidgetTester tester, {
     Map<String, Object> prefs = const {},
     bool paired = true,
-    String appVersion = '0.4.3 (4)', // same MAJOR.MINOR as the mock firmware
+    String appVersion = '0.5.3 (4)', // same MAJOR.MINOR as the mock firmware
   }) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;

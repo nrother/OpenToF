@@ -511,4 +511,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stageProvisional => 'Provisional (sensor\'s first estimate)';
+
+  @override
+  String get ledHelpTile => 'LED signals';
+
+  @override
+  String get ledHelpTileHelp => 'What the lights on the sensor mean';
+
+  @override
+  String get ledHelpTitle => 'LED signals';
+
+  @override
+  String get ledHelpIntro =>
+      'The sensor has two small lights. The orange one shows what the sensor is doing. The bars below show each signal over about two seconds: orange means the light is on.';
+
+  @override
+  String get ledOrangeSection => 'Orange light';
+
+  @override
+  String get ledWaitingTitle => 'Slow blinking';
+
+  @override
+  String get ledWaitingTiming => '0.3 s on, 0.7 s off, repeating';
+
+  @override
+  String get ledWaitingMeaning =>
+      'The sensor is awake and waiting for the app. The app connects by itself once the sensor is paired.';
+
+  @override
+  String get ledConnectedTitle => 'On all the time';
+
+  @override
+  String get ledConnectedTiming => 'Steady light';
+
+  @override
+  String get ledConnectedMeaning =>
+      'The app is connected. The sensor does not go to sleep while it is connected.';
+
+  @override
+  String get ledGoingToSleepTitle => '6 quick blinks, then off';
+
+  @override
+  String get ledGoingToSleepTiming => '0.15 s on, 0.15 s off, 6 times';
+
+  @override
+  String get ledGoingToSleepMeaning =>
+      'The sensor is going to sleep to save battery. This happens after 1 minute without a connected app and without a jump.';
+
+  @override
+  String get ledAsleepTitle => 'Off';
+
+  @override
+  String get ledAsleepTiming => 'No light';
+
+  @override
+  String get ledAsleepMeaning =>
+      'The sensor is asleep and the app cannot find it. Shake or hit the sensor to wake it up: it reacts within about 4 seconds. If nothing happens, the battery may be empty.';
+
+  @override
+  String get ledWokeUpTitle => '3 short blinks, then slow blinking';
+
+  @override
+  String get ledWokeUpTiming => '0.08 s on, 0.08 s off, 3 times';
+
+  @override
+  String get ledWokeUpMeaning =>
+      'The sensor noticed the movement and woke up. It is now waiting for the app.';
+
+  @override
+  String get ledErrorTitle => 'Fast blinking that does not stop';
+
+  @override
+  String get ledErrorTiming => '0.1 s on, 0.1 s off, without end';
+
+  @override
+  String get ledErrorMeaning =>
+      'The sensor could not start and does not work. Press the reset button on the sensor or disconnect and reconnect its power.';
+
+  @override
+  String get ledRedSection => 'Red light';
+
+  @override
+  String get ledRedBody =>
+      'The red light belongs to the charging electronics, not to the sensor software. It can light up or blink while the sensor is plugged in via USB. It says nothing about the connection to the app.';
 }

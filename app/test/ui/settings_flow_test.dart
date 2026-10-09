@@ -25,11 +25,31 @@ Future<void> openSensor(AppHarness h) async {
 }
 
 void main() {
+  testWidgets('settings open the LED help page, also without a sensor', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester, paired: false);
+    await openSettings(h);
+    await tester.tap(find.text('LED signals'));
+    await settleRoute(h);
+
+    expect(find.text('Orange light'), findsOneWidget);
+    expect(find.text('Slow blinking'), findsOneWidget);
+    expect(find.text('0.3 s on, 0.7 s off, repeating'), findsOneWidget);
+    expect(find.text('On all the time'), findsOneWidget);
+    expect(find.text('6 quick blinks, then off'), findsOneWidget);
+    expect(find.text('Off'), findsOneWidget);
+    expect(find.text('3 short blinks, then slow blinking'), findsOneWidget);
+    expect(find.text('Fast blinking that does not stop'), findsOneWidget);
+    expect(find.text('Red light'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('settings show the app version', (tester) async {
     final h = await AppHarness.launch(tester);
     await openSettings(h);
     expect(find.text('Version'), findsOneWidget);
-    expect(find.text('0.4.3 (4)'), findsOneWidget);
+    expect(find.text('0.5.3 (4)'), findsOneWidget);
   });
 
   testWidgets('back twice exits, a single back only shows a hint', (
@@ -231,7 +251,7 @@ void main() {
     expect(find.text('OpenToF Sensor (simulated)'), findsOneWidget);
     expect(find.text('MOCK-0001'), findsOneWidget);
     expect(find.text('0.1'), findsOneWidget);
-    expect(find.text('0.4.0'), findsOneWidget);
+    expect(find.text('0.5.0'), findsOneWidget);
     expect(find.text('MockJumpDetector'), findsOneWidget);
   });
 
@@ -251,7 +271,7 @@ void main() {
   testWidgets('no warning while app and firmware share MAJOR.MINOR', (
     tester,
   ) async {
-    final h = await AppHarness.launch(tester); // app 0.4.3, firmware 0.4.0
+    final h = await AppHarness.launch(tester); // app 0.5.3, firmware 0.5.0
     await openSettings(h);
     expect(find.text("Sensor firmware doesn't match this app"), findsNothing);
   });
@@ -259,11 +279,11 @@ void main() {
   testWidgets('settings and the sensor page warn on a version mismatch', (
     tester,
   ) async {
-    final h = await AppHarness.launch(tester, appVersion: '0.5.0 (7)');
+    final h = await AppHarness.launch(tester, appVersion: '0.6.0 (7)');
     await openSettings(h);
     expect(find.text("Sensor firmware doesn't match this app"), findsOneWidget);
     expect(
-      find.textContaining('App 0.5.0, sensor firmware 0.4.0'),
+      find.textContaining('App 0.6.0, sensor firmware 0.5.0'),
       findsOneWidget,
     );
     await tester.tap(find.text('OpenToF-Mock'));

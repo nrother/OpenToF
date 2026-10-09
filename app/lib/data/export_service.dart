@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../domain/chart_event.dart';
 import '../domain/csv_exporter.dart';
 import '../domain/jump.dart';
 import '../domain/routine.dart';
@@ -12,8 +13,12 @@ abstract class ExportService {
   Future<void> shareRoutine(RoutineState routine, {DateTime? now});
 
   /// Opens the OS share sheet with arbitrary jumps (e.g. the last minute) as
-  /// a CSV file.
-  Future<void> shareJumps(List<Jump> jumps, {DateTime? now});
+  /// a CSV file. [events] adds routine start/stop markers for that window.
+  Future<void> shareJumps(
+    List<Jump> jumps, {
+    List<ChartEvent> events = const [],
+    DateTime? now,
+  });
 }
 
 class ShareExportService implements ExportService {
@@ -24,9 +29,13 @@ class ShareExportService implements ExportService {
   );
 
   @override
-  Future<void> shareJumps(List<Jump> jumps, {DateTime? now}) => _share(
+  Future<void> shareJumps(
+    List<Jump> jumps, {
+    List<ChartEvent> events = const [],
+    DateTime? now,
+  }) => _share(
     CsvExporter.fileName(now ?? DateTime.now(), kind: 'jumps'),
-    CsvExporter.buildJumps(jumps),
+    CsvExporter.buildJumps(jumps, events: events),
   );
 
   Future<void> _share(String name, String csv) async {

@@ -247,7 +247,10 @@ class BleSensor implements Sensor {
     final stop = _stop;
     if (stop != null && !stop.isCompleted) stop.complete();
     try {
-      await _device.disconnect();
+      // queue: false cancels a connection attempt that is still running.
+      // Queued, the disconnect would wait behind it until it times out, which
+      // stalls quitting the app while the sensor is out of reach.
+      await _device.disconnect(queue: false);
     } catch (_) {}
     _set(SensorConnectionState.disconnected);
   }

@@ -11,6 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../brand_logo.dart';
 import '../main/jump_details.dart';
+import 'led_help_screen.dart';
 import 'sensor_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -105,6 +106,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _openSensor() =>
       Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => const SensorScreen()));
+
+  void _openLedHelp() =>
+      Navigator.of(context)
+          .push(MaterialPageRoute<void>(builder: (_) => const LedHelpScreen()));
 
   void _unpair() {
     ref.read(settingsProvider.notifier).unpair();
@@ -205,6 +210,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? null
                     : () => notifier.pair(d.id, d.name.isEmpty ? null : d.name),
               ),
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: Text(l.ledHelpTile),
+              subtitle: Text(l.ledHelpTileHelp),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _openLedHelp,
+            ),
 
             SettingsSection(l.routineSection),
             ListTile(

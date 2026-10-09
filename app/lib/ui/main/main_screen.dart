@@ -117,6 +117,14 @@ class MainScreen extends ConsumerWidget {
       ];
     }
 
+    List<ChartEvent> lastEvents(int seconds) {
+      final from = now.subtract(Duration(seconds: seconds));
+      return [
+        for (final e in session.events)
+          if (e.at.isAfter(from)) e,
+      ];
+    }
+
     final windowLabels = {30: l.window30s, 60: l.window1m, 300: l.window5m};
     final export = ref.read(exportServiceProvider);
     final action = await showModalBottomSheet<Future<void> Function()>(
@@ -150,8 +158,11 @@ class MainScreen extends ConsumerWidget {
                     title: Text(l.exportLastWindow(windowLabels[seconds]!)),
                     subtitle: Text(l.jumpCount(jumps.length)),
                     enabled: jumps.isNotEmpty,
-                    onTap: () =>
-                        Navigator.pop(context, () => export.shareJumps(jumps)),
+                    onTap: () => Navigator.pop(
+                      context,
+                      () =>
+                          export.shareJumps(jumps, events: lastEvents(seconds)),
+                    ),
                   );
                 },
               ),

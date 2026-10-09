@@ -9,6 +9,32 @@ firmware 0.4.x, and older firmware (≤ 0.3.2) no longer works with the new app 
 
 For the reasoning behind individual choices see `docs/DECISIONS.md`; this file only says what changed.
 
+## 0.5.0 — unreleased (2026-10-09)
+
+**App 0.5.0** (build 4) and **firmware 0.5.0**. The BLE protocol is unchanged (still protocol 1), but update
+both: the app warns when the sensor still runs 0.4.x.
+
+### Sensor firmware
+- **Deep sleep:** the sensor goes to sleep after 1 minute without a connected app and without a jump, and
+  uses far less battery while lying around. It never sleeps while an app is connected.
+- **Shake or hit it to wake it up.** It reacts within about 4 seconds and then starts like after a reset, so
+  the app sees a restarted sensor and reconnects as usual.
+- While asleep, the sensor is not visible to the app and an upload from the Arduino IDE can fail: wake it
+  first or simply retry the upload.
+- **New LED signals:** slow blinking = waiting for the app (previously off), steady on = connected (as before),
+  6 quick blinks = going to sleep, off = asleep, 3 short blinks = woken up. Timings and the remaining signals
+  are listed in `firmware/README.md`.
+- New settings in `config/FirmwareConfig.h`: switch deep sleep on/off, idle time before sleeping, how often
+  the sleeping sensor checks for motion, how strong the motion must be, and the waiting blink rhythm.
+
+### App
+- **LED help page:** Settings → LED signals explains what the sensor's lights mean (waiting, connected, going
+  to sleep, asleep, woken up, error), with a picture of each blink pattern.
+- **CSV export without the `total` row:** every row after the header is now a jump (or a marker, see next).
+- **Routine markers in time-range exports:** exporting the last 30 s / 1 min / 5 min adds `routine_start` and
+  `routine_stop` rows at the right place between the jumps.
+- **Fixed:** quitting the app or disconnecting no longer hangs while the sensor is out of reach.
+
 ## 0.4.0 — unreleased (2026-09-26)
 
 Versions are aligned: **app 0.4.0** (build 3, previously 1.1.0) and **firmware 0.4.0** (previously 0.3.2). The

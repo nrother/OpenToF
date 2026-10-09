@@ -105,7 +105,7 @@ class MockSensor implements Sensor {
     modelNumber: 'OpenToF Sensor (simulated)',
     serialNumber: 'MOCK-0001',
     hardwareRevision: '0.1',
-    firmwareRevision: '0.4.0',
+    firmwareRevision: '0.5.0',
     softwareRevision: 'MockJumpDetector',
   );
 

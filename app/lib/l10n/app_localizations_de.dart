@@ -512,4 +512,87 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get stageProvisional => 'Vorläufig (erste Schätzung des Sensors)';
+
+  @override
+  String get ledHelpTile => 'LED-Signale';
+
+  @override
+  String get ledHelpTileHelp => 'Was die Lichter am Sensor bedeuten';
+
+  @override
+  String get ledHelpTitle => 'LED-Signale';
+
+  @override
+  String get ledHelpIntro =>
+      'Der Sensor hat zwei kleine Lichter. Das orange zeigt, was der Sensor gerade tut. Die Balken unten zeigen jedes Signal über etwa zwei Sekunden: Orange bedeutet, das Licht ist an.';
+
+  @override
+  String get ledOrangeSection => 'Oranges Licht';
+
+  @override
+  String get ledWaitingTitle => 'Langsames Blinken';
+
+  @override
+  String get ledWaitingTiming => '0,3 s an, 0,7 s aus, fortlaufend';
+
+  @override
+  String get ledWaitingMeaning =>
+      'Der Sensor ist wach und wartet auf die App. Die App verbindet sich von selbst, sobald der Sensor gekoppelt ist.';
+
+  @override
+  String get ledConnectedTitle => 'Dauerhaft an';
+
+  @override
+  String get ledConnectedTiming => 'Dauerlicht';
+
+  @override
+  String get ledConnectedMeaning =>
+      'Die App ist verbunden. Solange die Verbindung besteht, schläft der Sensor nicht ein.';
+
+  @override
+  String get ledGoingToSleepTitle => '6-mal schnelles Blinken, dann aus';
+
+  @override
+  String get ledGoingToSleepTiming => '0,15 s an, 0,15 s aus, 6-mal';
+
+  @override
+  String get ledGoingToSleepMeaning =>
+      'Der Sensor schläft ein, um Akku zu sparen. Das passiert nach 1 Minute ohne verbundene App und ohne Sprung.';
+
+  @override
+  String get ledAsleepTitle => 'Aus';
+
+  @override
+  String get ledAsleepTiming => 'Kein Licht';
+
+  @override
+  String get ledAsleepMeaning =>
+      'Der Sensor schläft und die App findet ihn nicht. Sensor schütteln oder anstoßen, um ihn aufzuwecken: Er reagiert innerhalb von etwa 4 Sekunden. Passiert nichts, ist möglicherweise der Akku leer.';
+
+  @override
+  String get ledWokeUpTitle => '3-mal kurzes Blinken, dann langsames Blinken';
+
+  @override
+  String get ledWokeUpTiming => '0,08 s an, 0,08 s aus, 3-mal';
+
+  @override
+  String get ledWokeUpMeaning =>
+      'Der Sensor hat die Bewegung bemerkt und ist aufgewacht. Er wartet jetzt auf die App.';
+
+  @override
+  String get ledErrorTitle => 'Schnelles Blinken ohne Ende';
+
+  @override
+  String get ledErrorTiming => '0,1 s an, 0,1 s aus, ohne Ende';
+
+  @override
+  String get ledErrorMeaning =>
+      'Der Sensor konnte nicht starten und funktioniert nicht. Reset-Taste am Sensor drücken oder die Stromversorgung trennen und wieder verbinden.';
+
+  @override
+  String get ledRedSection => 'Rotes Licht';
+
+  @override
+  String get ledRedBody =>
+      'Das rote Licht gehört zur Ladeelektronik, nicht zur Sensor-Software. Es kann leuchten oder blinken, solange der Sensor per USB angeschlossen ist. Über die Verbindung zur App sagt es nichts aus.';
 }

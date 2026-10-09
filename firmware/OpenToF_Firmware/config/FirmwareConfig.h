@@ -29,11 +29,38 @@
 #define IMU_HEARTBEAT_MS 2000UL
 
 // ============================================================================
+// Deep sleep (core/DeepSleep.h). Not used in DEMO_MODE.
+// ============================================================================
+
+// 1 = go to deep sleep when nothing happens, wake up again when the device is shaken/hit.
+// While asleep the device does not advertise and cannot be flashed: wake it first (shake it or
+// press reset), or hold D1 low during a reset to keep it awake.
+#define DEEP_SLEEP_ENABLED 1
+
+// Sleep after this long without a BLE connection and without a takeoff/landing.
+// The device never sleeps while an app is connected.
+#define SLEEP_AFTER_IDLE_MS 60000UL
+
+// While asleep, wake up this often for a moment to ask the IMU whether it saw motion. Shorter =
+// reacts faster, but uses more power.
+#define SLEEP_POLL_INTERVAL_MS 3000
+
+// How hard the device must be moved to wake up (IMU registers, see the LSM6DS3TR-C datasheet).
+// The IMU compares each acceleration sample with the one before (26 Hz, so 38 ms apart).
+// WAKE_UP_THS: threshold in steps of 2 g / 64 = 31 mg (0x01..0x3F). Lower = more sensitive.
+// WAKE_UP_DUR: 0x00 = a single sample above the threshold wakes; 0x20/0x40/0x60 = it must stay
+//              above for 1/2/3 more samples (less sensitive to short knocks).
+// firmware/deep_sleep_test/ used 0x08 and 0x3F: that needs a hard hit, shaking by hand is
+// often not enough.
+#define IMU_WAKE_UP_THS 0x02
+#define IMU_WAKE_UP_DUR 0x00
+
+// ============================================================================
 // Device identity (exposed over BLE, see BleUuids.h for the field ids)
 // Every string must be at most DIS_STRING_MAX (32) bytes.
 // ============================================================================
 
-#define FIRMWARE_VERSION "0.4.0"    // Firmware Revision String; bump on every release
+#define FIRMWARE_VERSION "0.5.0"    // Firmware Revision String; bump on every release
 #define HARDWARE_REVISION "0.1"     // Hardware Revision String; change with the PCB/board
 #define MANUFACTURER_NAME "OpenToF"
 #define MODEL_NUMBER "OpenToF Sensor"
@@ -65,6 +92,11 @@
 #define RF_SWITCH_PIN PB4  // LOW = onboard antenna (as in the Seeed BLE example)
 
 #define BATTERY_INTERVAL_MS 30000UL
+
+// LED while waiting for the app to connect: on for ..._ON_MS, off for ..._OFF_MS, repeating.
+// All LED signals are listed in firmware/README.md ("LED status").
+#define LED_WAITING_ON_MS 300
+#define LED_WAITING_OFF_MS 700
 
 #ifndef LED_BUILTIN_ACTIVE
 #define LED_BUILTIN_ACTIVE LOW

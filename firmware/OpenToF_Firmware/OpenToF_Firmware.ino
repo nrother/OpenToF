@@ -30,6 +30,7 @@
  *     BatteryMonitor.h      battery measurement
  *     DeviceName.h          device name in flash + validation
  *     BootCounter.h         boot counter in flash (lets the app notice a restarted clock)
+ *     DeepSleep.h           deep sleep when idle, wake-up on motion
  *     Logging.h, Micros64.h helpers
  *
  * Includes are relative to the including file: this .ino uses "core/Logging.h", headers use
@@ -69,6 +70,7 @@ typedef BedCycleJumpDetector ActiveJumpDetector;
 #include "core/BatteryMonitor.h"
 #include "core/BleService.h"
 #include "core/BootCounter.h"
+#include "core/DeepSleep.h"
 #include "core/DemoSource.h"
 #include "core/DeviceName.h"
 #include "core/ImuSource.h"
@@ -92,13 +94,81 @@ static void fatalBlink(const char* message) {
   }
 }
 
+// Blinks the LED `times` times (`ms` on, `ms` off) and leaves it off.
+static void blinkLed(int times, int ms) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+    delay(ms);
+    digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+    delay(ms);
+  }
+}
+
+// Status LED while running: steady on while an app is connected, slow blinking while waiting
+// for one. Call every loop(). The other LED signals are listed in firmware/README.md.
+static void updateStatusLed() {
+  static bool wasOn = false;
+  const bool on = bleConnected() ||
+                  millis() % (LED_WAITING_ON_MS + LED_WAITING_OFF_MS) < LED_WAITING_ON_MS;
+  if (on == wasOn) return;
+  wasOn = on;
+  digitalWrite(LED_BUILTIN, on ? LED_BUILTIN_ACTIVE : LED_BUILTIN_INACTIVE);
+}
+
+#if DEEP_SLEEP_ACTIVE
+// Goes to deep sleep after SLEEP_AFTER_IDLE_MS without a BLE connection and without a
+// takeoff/landing (`activity`). Call every loop().
+static void sleepWhenIdle(bool activity) {
+  static uint32_t lastActiveMs = 0;
+  if (activity || bleConnected()) lastActiveMs = millis();
+  if (millis() - lastActiveMs < SLEEP_AFTER_IDLE_MS) return;
+  lastActiveMs = millis();
+
+  LOG("Idle, going to deep sleep");
+  flushDeviceName();
+  if (!imuSource.armWakeOnMotion()) {
+    // Without a working wake-up source the device would sleep forever: stay awake instead.
+    LOG("IMU wake-up setup failed, staying awake");
+    if (!imuSource.begin()) fatalBlink("IMU init failed");
+    return;
+  }
+  bleEnd();
+  blinkLed(6, 150);  // going to sleep now
+
+  // Every pad keeps its current state during the sleep (see DeepSleep.h), so switch off
+  // everything that draws current. IMU_POWER_PIN stays high and the IMU's I2C pins stay as
+  // they are (idle, pulled up): the IMU keeps running and must not see a disturbed bus.
+  digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+  digitalWrite(RF_SWITCH_POWER_PIN, LOW);
+  digitalWrite(BATTERY_ENABLE_PIN, LOW);
+#if DEBUG_SERIAL
+  Serial.flush();
+#endif
+  deepSleepEnter();
+}
+#endif
+
 void setup() {
+#if DEEP_SLEEP_ACTIVE
+  // Woken by the sleep timer: only ask the IMU for motion and sleep again if there was none.
+  // This runs every few seconds while asleep, so it comes first: before anything configures a
+  // pin (the IMU must stay powered), writes flash (boot counter) or takes time (BLE, Serial).
+  const bool timerWake = deepSleepTimerWake();
+  if (timerWake && !imuSource.motionSinceSleep()) deepSleepEnter();
+#endif
+
 #if DEBUG_SERIAL
   Serial.begin(SERIAL_BAUD);  // do not wait for a host: the device runs standalone
 #endif
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
   LOG(String("OpenToF firmware ") + FIRMWARE_VERSION + " (hardware " + HARDWARE_REVISION + ")");
+#if DEEP_SLEEP_ACTIVE
+  if (timerWake) {
+    LOG("Woke up from deep sleep: motion detected");
+    blinkLed(3, 80);  // show that the shake was noticed
+  }
+#endif
 
   // Antenna switch: power it, select the onboard antenna.
   pinMode(RF_SWITCH_POWER_PIN, OUTPUT);
@@ -135,10 +205,19 @@ void setup() {
 void loop() {
   blePoll();
 
+  bool activity = false;
   Transition t;
-  while (source->poll(t)) publisher.handle(t);
+  while (source->poll(t)) {
+    publisher.handle(t);
+    activity = true;
+  }
 
   if (battery.update(false)) bleSetBatteryLevel(battery.percent());
 
   flushDeviceName();
+  updateStatusLed();
+
+#if DEEP_SLEEP_ACTIVE
+  sleepWhenIdle(activity);
+#endif
 }

@@ -146,13 +146,11 @@ static void onNameWritten(BLEDevice central, BLECharacteristic characteristic) {
 
 static void onConnected(BLEDevice central) {
   (void)central;
-  digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
   LOG("BLE connected");
 }
 
 static void onDisconnected(BLEDevice central) {
   (void)central;
-  digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
   LOG("BLE disconnected");
 }
 
@@ -220,12 +218,21 @@ static void bleStartAdvertising() {
   LOG(String("Advertising as ") + deviceName);
 }
 
+// True while an app is connected (as of the last blePoll()).
+static bool bleIsConnected = false;
+static bool bleConnected() { return bleIsConnected; }
+
+// Stops advertising and shuts the BLE stack down (before deep sleep).
+static void bleEnd() {
+  BLE.stopAdvertise();
+  BLE.end();
+}
+
 // Call every loop(): services the stack and resumes advertising after a disconnect so the
 // app can reconnect.
 static void blePoll() {
-  static bool wasConnected = false;
   BLE.poll();
   const bool connected = BLE.connected();
-  if (wasConnected && !connected) BLE.advertise();
-  wasConnected = connected;
+  if (bleIsConnected && !connected) BLE.advertise();
+  bleIsConnected = connected;
 }

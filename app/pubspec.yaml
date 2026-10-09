@@ -2,7 +2,7 @@ name: opentof_app
 description: "OpenToF companion app for trampoline time-of-flight sensor"
 publish_to: 'none'
 
-version: 0.4.0+3
+version: 0.5.0+4
 
 environment:
   sdk: ^3.13.4

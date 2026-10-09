@@ -1,5 +1,10 @@
-// Boot counter: persisted in flash (EEPROM library), incremented on every start. The app reads
-// it (Info characteristic) to notice that the device clock restarted.
+// Boot counter: persisted in flash (EEPROM library), incremented on every full start (power-on,
+// reset, or waking up from deep sleep because of motion). The app reads it (Info characteristic)
+// to notice that the device clock restarted.
+//
+// Not counted: the short wake-ups every SLEEP_POLL_INTERVAL_MS during deep sleep that only ask
+// the IMU for motion and go back to sleep (see DeepSleep.h). Counting those would write flash
+// every few seconds and wear it out.
 #pragma once
 
 #include <EEPROM.h>
@@ -10,7 +15,8 @@
 static const int EE_BOOT_ADDR = 32;
 static uint16_t bootCount = 0;
 
-// Reads, increments and stores the counter. Call once in setup().
+// Reads, increments and stores the counter. Call once in setup(), after the deep-sleep wake
+// check (which does not return for a wake-up that goes back to sleep).
 static void incrementBootCount() {
   uint16_t count = 0;
   if (EEPROM.read(EE_BOOT_ADDR) == 0x42 && EEPROM.read(EE_BOOT_ADDR + 1) == 0x43) {

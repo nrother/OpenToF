@@ -61,6 +61,40 @@ class ImuSource : public TransitionSource {
 
   const ImuProfile& profile() const { return *_profile; }
 
+  // ---- Deep sleep (see DeepSleep.h) ----
+
+  // Switches the IMU from measuring to its low-power "wake-up" function: accelerometer only at
+  // 26 Hz, and a latched interrupt flag that is set once the acceleration changes by more than
+  // the threshold. Call right before deep sleep; begin() is needed to measure again.
+  // Returns false if the IMU did not take the configuration (then do not sleep: it would
+  // never report motion).
+  bool armWakeOnMotion() {
+    bool ok = writeReg(0x12, 0x01);  // CTRL3_C: software reset
+    delay(20);
+    ok = ok && writeReg(0x10, 0x20);             // CTRL1_XL: accel 26 Hz, +-2 g (gyro stays off)
+    ok = ok && writeReg(0x5B, IMU_WAKE_UP_THS);  // WAKE_UP_THS
+    ok = ok && writeReg(0x5C, IMU_WAKE_UP_DUR);  // WAKE_UP_DUR
+    ok = ok && writeReg(0x5E, 0x20);  // MD1_CFG: wake-up on INT1 (pin not connected, but
+                                      // required for the latched mode)
+    ok = ok && writeReg(0x58, 0x81);  // TAP_CFG: interrupts enabled, latched
+    delay(200);                       // let the filter settle on gravity...
+    uint8_t src;
+    return ok && _imu.readRegister(&src, 0x1B) == IMU_SUCCESS;  // ...and clear the flag it set
+  }
+
+  // After a wake-up from deep sleep: true if the IMU saw motion since armWakeOnMotion() (reading
+  // the flag clears it). Also true if the IMU does not answer, so that the caller does a normal
+  // start instead of sleeping without a working wake-up source.
+  // Must not touch IMU_POWER_PIN (see DeepSleep.h), so no begin() here: the library's begin()
+  // only adds Wire1.begin() to the pin setup, which is done here instead.
+  bool motionSinceSleep() {
+    Wire1.begin();
+    uint8_t value;
+    if (_imu.readRegister(&value, 0x0F) != IMU_SUCCESS || value != 0x6A) return true;  // WHO_AM_I
+    if (_imu.readRegister(&value, 0x1B) != IMU_SUCCESS) return true;                   // WAKE_UP_SRC
+    return (value & 0x08) != 0;                                                        // WU_IA
+  }
+
   const char* name() const override { return _detector.name(); }
   const char* fieldsJson() const override { return _detector.fieldsJson(); }
   const char* reasonsJson() const override { return _detector.reasonsJson(); }
@@ -166,6 +200,8 @@ class ImuSource : public TransitionSource {
   // problem. Six transactions instead of one costs a bit of I2C time (well under the sample
   // period even at 833 Hz), which is the trade-off for using the proven-working access pattern.
   bool readRegPair(uint8_t offset, int16_t& out) { return _imu.readRegisterInt16(&out, offset) == IMU_SUCCESS; }
+
+  bool writeReg(uint8_t offset, uint8_t value) { return _imu.writeRegister(offset, value) == IMU_SUCCESS; }
 
   bool readSample(ImuData& d) {
     int16_t gx, gy, gz, ax, ay, az;

@@ -27,6 +27,12 @@ types in their signatures.
 Compile check (works from PowerShell, ~1 min, run from inside `firmware/`): the Arduino IDE's bundled CLI at
 `$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_arduino --build-path <tmp> OpenToF_Firmware`.
 
+Deep sleep (`core/DeepSleep.h`, read its header comment before touching IMU or pin setup): the device sleeps in
+EM4 when idle and wakes up every 3 s to ask the IMU for motion. Anything added to `setup()` must come after the
+wake check at its top, and nothing before that check may call `pinMode()` on `IMU_POWER_PIN`. While it sleeps an
+upload fails with "cannot read IDR": retry a few times, or shake the device first. For testing, lower
+`SLEEP_AFTER_IDLE_MS`.
+
 ## Other files in this folder
 `datalogger_selfmade/`, `ble_test/` and `deep_sleep_test/` are standalone preliminary/reference sketches, not part of
 `OpenToF_Firmware/`. Hardware datasheets (battery, IMU, board schematic) live in `../docs/hardware/`, not here.

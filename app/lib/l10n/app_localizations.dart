@@ -1003,6 +1003,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Provisional (sensor\'s first estimate)'**
   String get stageProvisional;
+
+  /// No description provided for @ledHelpTile.
+  ///
+  /// In en, this message translates to:
+  /// **'LED signals'**
+  String get ledHelpTile;
+
+  /// No description provided for @ledHelpTileHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'What the lights on the sensor mean'**
+  String get ledHelpTileHelp;
+
+  /// No description provided for @ledHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LED signals'**
+  String get ledHelpTitle;
+
+  /// No description provided for @ledHelpIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor has two small lights. The orange one shows what the sensor is doing. The bars below show each signal over about two seconds: orange means the light is on.'**
+  String get ledHelpIntro;
+
+  /// No description provided for @ledOrangeSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Orange light'**
+  String get ledOrangeSection;
+
+  /// No description provided for @ledWaitingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow blinking'**
+  String get ledWaitingTitle;
+
+  /// No description provided for @ledWaitingTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'0.3 s on, 0.7 s off, repeating'**
+  String get ledWaitingTiming;
+
+  /// No description provided for @ledWaitingMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is awake and waiting for the app. The app connects by itself once the sensor is paired.'**
+  String get ledWaitingMeaning;
+
+  /// No description provided for @ledConnectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On all the time'**
+  String get ledConnectedTitle;
+
+  /// No description provided for @ledConnectedTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'Steady light'**
+  String get ledConnectedTiming;
+
+  /// No description provided for @ledConnectedMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The app is connected. The sensor does not go to sleep while it is connected.'**
+  String get ledConnectedMeaning;
+
+  /// No description provided for @ledGoingToSleepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'6 quick blinks, then off'**
+  String get ledGoingToSleepTitle;
+
+  /// No description provided for @ledGoingToSleepTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'0.15 s on, 0.15 s off, 6 times'**
+  String get ledGoingToSleepTiming;
+
+  /// No description provided for @ledGoingToSleepMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is going to sleep to save battery. This happens after 1 minute without a connected app and without a jump.'**
+  String get ledGoingToSleepMeaning;
+
+  /// No description provided for @ledAsleepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get ledAsleepTitle;
+
+  /// No description provided for @ledAsleepTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'No light'**
+  String get ledAsleepTiming;
+
+  /// No description provided for @ledAsleepMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is asleep and the app cannot find it. Shake or hit the sensor to wake it up: it reacts within about 4 seconds. If nothing happens, the battery may be empty.'**
+  String get ledAsleepMeaning;
+
+  /// No description provided for @ledWokeUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'3 short blinks, then slow blinking'**
+  String get ledWokeUpTitle;
+
+  /// No description provided for @ledWokeUpTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'0.08 s on, 0.08 s off, 3 times'**
+  String get ledWokeUpTiming;
+
+  /// No description provided for @ledWokeUpMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor noticed the movement and woke up. It is now waiting for the app.'**
+  String get ledWokeUpMeaning;
+
+  /// No description provided for @ledErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast blinking that does not stop'**
+  String get ledErrorTitle;
+
+  /// No description provided for @ledErrorTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'0.1 s on, 0.1 s off, without end'**
+  String get ledErrorTiming;
+
+  /// No description provided for @ledErrorMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor could not start and does not work. Press the reset button on the sensor or disconnect and reconnect its power.'**
+  String get ledErrorMeaning;
+
+  /// No description provided for @ledRedSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Red light'**
+  String get ledRedSection;
+
+  /// No description provided for @ledRedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The red light belongs to the charging electronics, not to the sensor software. It can light up or blink while the sensor is plugged in via USB. It says nothing about the connection to the app.'**
+  String get ledRedBody;
 }
 
 class _AppLocalizationsDelegate
