@@ -102,4 +102,12 @@ void main() {
     expect(BleProtocol.firmwareRevisionCharacteristic, '2a26');
     expect(BleProtocol.softwareRevisionCharacteristic, '2a28');
   });
+
+  test('command characteristic: UUID 000a, sleep is the single byte 0x01', () {
+    expect(
+      BleProtocol.commandCharacteristic,
+      '6f70656e-546f-4600-000a-000000000000',
+    );
+    expect(BleProtocol.encodeCommand(SensorCommand.sleep), [0x01]);
+  });
 }

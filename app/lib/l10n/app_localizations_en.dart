@@ -47,7 +47,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startDisabledHint =>
-      'Start is available while you are jumping: it counts the jump you just made as jump 1.';
+      'Start is available while you are jumping: the jump you are in counts as jump 1.';
 
   @override
   String get routineTitle => 'Routine';
@@ -523,7 +523,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledHelpIntro =>
-      'The sensor has two small lights. The orange one shows what the sensor is doing. The bars below show each signal over about two seconds: orange means the light is on.';
+      'The sensor has an orange and a red light. Both sit right next to each other in the same tiny part, so they are easy to mix up. The orange one shows what the sensor is doing, the red one belongs to charging. The bars below show each signal over about two seconds: the coloured part means the light is on.';
 
   @override
   String get ledOrangeSection => 'Orange light';
@@ -589,9 +589,104 @@ class AppLocalizationsEn extends AppLocalizations {
       'The sensor could not start and does not work. Press the reset button on the sensor or disconnect and reconnect its power.';
 
   @override
-  String get ledRedSection => 'Red light';
+  String get ledRedSection => 'Red light (charging)';
 
   @override
   String get ledRedBody =>
-      'The red light belongs to the charging electronics, not to the sensor software. It can light up or blink while the sensor is plugged in via USB. It says nothing about the connection to the app.';
+      'The red light belongs to the charging chip, not to the sensor software. It only works while the sensor is plugged in via USB: on battery power it is always off. It says nothing about the connection to the app.';
+
+  @override
+  String get ledChargingTitle => 'Short flash about once a second';
+
+  @override
+  String get ledChargingTiming => '0.16 s on, 1.12 s off, repeating';
+
+  @override
+  String get ledChargingMeaning =>
+      'The battery is charging. The last part of charging is slow: the light can keep flashing for half an hour or more while the app already shows over 90 %.';
+
+  @override
+  String get ledChargedTitle => 'On for just under a minute, then off';
+
+  @override
+  String get ledChargedTiming => 'Steady light for about 50 s';
+
+  @override
+  String get ledChargedMeaning =>
+      'The battery is full. After that the light stays off, even though USB is still connected.';
+
+  @override
+  String get ledChargeOffTitle => 'Off while plugged in';
+
+  @override
+  String get ledChargeOffTiming => 'No light';
+
+  @override
+  String get ledChargeOffMeaning =>
+      'Usually the battery is full. If the sensor was just plugged in and the red light never came on, check the cable and the power source. The light can start flashing again later when the charger tops the battery up.';
+
+  @override
+  String get ledRedSource =>
+      'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.';
+
+  @override
+  String get connectionAsleep => 'Sensor asleep';
+
+  @override
+  String get sleepSensor => 'Put sensor to sleep';
+
+  @override
+  String get sleepSensorHelp =>
+      'Saves battery until you need the sensor again.';
+
+  @override
+  String get sleepSensorNotConnected =>
+      'Only possible while the sensor is connected.';
+
+  @override
+  String get sleepSensorAsleep =>
+      'The sensor is asleep. Shake or hit it to wake it up; the app then reconnects by itself.';
+
+  @override
+  String get sleepConfirmTitle => 'Put sensor to sleep?';
+
+  @override
+  String get sleepConfirmBody =>
+      'The sensor disconnects, blinks 6 times and sleeps until it is moved.\n\nTo wake it up, shake or hit it: it reacts within about 4 seconds, and the app reconnects by itself.';
+
+  @override
+  String get sleepAction => 'Put to sleep';
+
+  @override
+  String get sleepStarted =>
+      'The sensor is going to sleep. Shake or hit it to wake it up.';
+
+  @override
+  String sleepFailed(String message) {
+    return 'Could not put the sensor to sleep: $message';
+  }
+
+  @override
+  String get simWake => 'Simulate wake-up';
+
+  @override
+  String get changelogTileHelp => 'Show what changed';
+
+  @override
+  String get changelogTitle => 'Changelog';
+
+  @override
+  String get changelogAppTab => 'App';
+
+  @override
+  String get changelogFirmwareTab => 'Sensor firmware';
+
+  @override
+  String get changelogLanguageNote => '';
+
+  @override
+  String get changelogAbout => 'About the version numbers';
+
+  @override
+  String get changelogLoadFailed => 'The changelog could not be loaded.';
 }

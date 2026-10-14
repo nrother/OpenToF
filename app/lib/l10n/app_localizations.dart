@@ -161,7 +161,7 @@ abstract class AppLocalizations {
   /// No description provided for @startDisabledHint.
   ///
   /// In en, this message translates to:
-  /// **'Start is available while you are jumping: it counts the jump you just made as jump 1.'**
+  /// **'Start is available while you are jumping: the jump you are in counts as jump 1.'**
   String get startDisabledHint;
 
   /// No description provided for @routineTitle.
@@ -1025,7 +1025,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledHelpIntro.
   ///
   /// In en, this message translates to:
-  /// **'The sensor has two small lights. The orange one shows what the sensor is doing. The bars below show each signal over about two seconds: orange means the light is on.'**
+  /// **'The sensor has an orange and a red light. Both sit right next to each other in the same tiny part, so they are easy to mix up. The orange one shows what the sensor is doing, the red one belongs to charging. The bars below show each signal over about two seconds: the coloured part means the light is on.'**
   String get ledHelpIntro;
 
   /// No description provided for @ledOrangeSection.
@@ -1145,14 +1145,182 @@ abstract class AppLocalizations {
   /// No description provided for @ledRedSection.
   ///
   /// In en, this message translates to:
-  /// **'Red light'**
+  /// **'Red light (charging)'**
   String get ledRedSection;
 
   /// No description provided for @ledRedBody.
   ///
   /// In en, this message translates to:
-  /// **'The red light belongs to the charging electronics, not to the sensor software. It can light up or blink while the sensor is plugged in via USB. It says nothing about the connection to the app.'**
+  /// **'The red light belongs to the charging chip, not to the sensor software. It only works while the sensor is plugged in via USB: on battery power it is always off. It says nothing about the connection to the app.'**
   String get ledRedBody;
+
+  /// No description provided for @ledChargingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Short flash about once a second'**
+  String get ledChargingTitle;
+
+  /// No description provided for @ledChargingTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'0.16 s on, 1.12 s off, repeating'**
+  String get ledChargingTiming;
+
+  /// No description provided for @ledChargingMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The battery is charging. The last part of charging is slow: the light can keep flashing for half an hour or more while the app already shows over 90 %.'**
+  String get ledChargingMeaning;
+
+  /// No description provided for @ledChargedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On for just under a minute, then off'**
+  String get ledChargedTitle;
+
+  /// No description provided for @ledChargedTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'Steady light for about 50 s'**
+  String get ledChargedTiming;
+
+  /// No description provided for @ledChargedMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'The battery is full. After that the light stays off, even though USB is still connected.'**
+  String get ledChargedMeaning;
+
+  /// No description provided for @ledChargeOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off while plugged in'**
+  String get ledChargeOffTitle;
+
+  /// No description provided for @ledChargeOffTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'No light'**
+  String get ledChargeOffTiming;
+
+  /// No description provided for @ledChargeOffMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Usually the battery is full. If the sensor was just plugged in and the red light never came on, check the cable and the power source. The light can start flashing again later when the charger tops the battery up.'**
+  String get ledChargeOffMeaning;
+
+  /// No description provided for @ledRedSource.
+  ///
+  /// In en, this message translates to:
+  /// **'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.'**
+  String get ledRedSource;
+
+  /// No description provided for @connectionAsleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor asleep'**
+  String get connectionAsleep;
+
+  /// No description provided for @sleepSensor.
+  ///
+  /// In en, this message translates to:
+  /// **'Put sensor to sleep'**
+  String get sleepSensor;
+
+  /// No description provided for @sleepSensorHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves battery until you need the sensor again.'**
+  String get sleepSensorHelp;
+
+  /// No description provided for @sleepSensorNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Only possible while the sensor is connected.'**
+  String get sleepSensorNotConnected;
+
+  /// No description provided for @sleepSensorAsleep.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is asleep. Shake or hit it to wake it up; the app then reconnects by itself.'**
+  String get sleepSensorAsleep;
+
+  /// No description provided for @sleepConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Put sensor to sleep?'**
+  String get sleepConfirmTitle;
+
+  /// No description provided for @sleepConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor disconnects, blinks 6 times and sleeps until it is moved.\n\nTo wake it up, shake or hit it: it reacts within about 4 seconds, and the app reconnects by itself.'**
+  String get sleepConfirmBody;
+
+  /// No description provided for @sleepAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Put to sleep'**
+  String get sleepAction;
+
+  /// No description provided for @sleepStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor is going to sleep. Shake or hit it to wake it up.'**
+  String get sleepStarted;
+
+  /// No description provided for @sleepFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not put the sensor to sleep: {message}'**
+  String sleepFailed(String message);
+
+  /// No description provided for @simWake.
+  ///
+  /// In en, this message translates to:
+  /// **'Simulate wake-up'**
+  String get simWake;
+
+  /// No description provided for @changelogTileHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Show what changed'**
+  String get changelogTileHelp;
+
+  /// No description provided for @changelogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Changelog'**
+  String get changelogTitle;
+
+  /// No description provided for @changelogAppTab.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get changelogAppTab;
+
+  /// No description provided for @changelogFirmwareTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor firmware'**
+  String get changelogFirmwareTab;
+
+  /// Shown above the changelog, whose text is English only. Empty in English; other languages say that the notes are in English.
+  ///
+  /// In en, this message translates to:
+  /// **''**
+  String get changelogLanguageNote;
+
+  /// No description provided for @changelogAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About the version numbers'**
+  String get changelogAbout;
+
+  /// No description provided for @changelogLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The changelog could not be loaded.'**
+  String get changelogLoadFailed;
 }
 
 class _AppLocalizationsDelegate

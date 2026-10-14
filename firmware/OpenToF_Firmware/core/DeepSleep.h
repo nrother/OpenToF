@@ -31,10 +31,7 @@
 #include "em_gpio.h"
 #include "em_rmu.h"
 
-#include "../config/FirmwareConfig.h"
-
-// Deep sleep needs the IMU as its wake-up source, which the demo does not use.
-#define DEEP_SLEEP_ACTIVE (DEEP_SLEEP_ENABLED && !DEMO_MODE)
+#include "../config/FirmwareConfig.h"  // DEEP_SLEEP_ACTIVE, SLEEP_POLL_INTERVAL_MS
 
 // Runs just before main(): there is a stack, but sl_system_init() has not run yet, so only
 // emlib works here (no Arduino API, no RTOS).

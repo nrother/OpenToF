@@ -28,6 +28,9 @@ MAJOR.MINOR. Full policy in the repo root `CLAUDE.md`.**
 Flutter is at `C:\Tools\flutter` and NOT on PATH — prefix every PowerShell call with
 `$env:Path = "C:\Tools\flutter\bin;" + $env:Path`. Run these from inside `app/`.
 - `flutter pub get` · `flutter analyze` · `flutter test` · `dart format lib test`
+- `dart run tool/sync_changelog.dart` (after editing the root `../Changelog.md`: copies it to
+  `assets/changelog/Changelog.md` for the in-app changelog; that copy is generated, never edit it by hand, and
+  `flutter test` fails while it is out of date)
 - `flutter gen-l10n` (after editing ARB files) · `flutter run` (device/emulator; use MockSensor in debug)
 - Android SDK is not installed here: `flutter build apk`/`run` on Android are unverified; analyze/test work.
 

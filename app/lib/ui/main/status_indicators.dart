@@ -8,10 +8,15 @@ class ConnectionIndicator extends StatelessWidget {
     super.key,
     required this.connection,
     required this.paired,
+    this.asleep = false,
   });
 
   final SensorConnectionState connection;
   final bool paired;
+
+  /// The app sent the sensor to sleep: while it is not connected, that is the
+  /// expected state rather than a lost connection.
+  final bool asleep;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +29,11 @@ class ConnectionIndicator extends StatelessWidget {
               l.connectionConnected,
               Icons.bluetooth_connected,
               Colors.green.shade600,
+            ),
+            _ when asleep => (
+              l.connectionAsleep,
+              Icons.bedtime_outlined,
+              scheme.outline,
             ),
             SensorConnectionState.connecting => (
               l.connectionConnecting,

@@ -19,6 +19,17 @@ import '../../domain/sensor_events.dart';
 ///  - Reasons          (Read): JSON array naming the reason bits
 ///  - Confidence kind  (Read): "none" | "heuristic" | "calibrated"
 ///  - Name             (Read/Write): UTF-8 string
+///  - Command          (Write with response): command u8, see
+///                     [SensorCommand]. Only on firmware with deep sleep;
+///                     its presence is how the app detects that feature.
+/// What the app can tell the sensor to do through the Command
+/// characteristic.
+enum SensorCommand {
+  /// Go to deep sleep now: the sensor disconnects, blinks and sleeps until it
+  /// is moved.
+  sleep,
+}
+
 class BleProtocol {
   BleProtocol._();
 
@@ -35,6 +46,7 @@ class BleProtocol {
   static const reasonsCharacteristic = '6f70656e-546f-4600-0008-000000000000';
   static const confidenceKindCharacteristic =
       '6f70656e-546f-4600-0009-000000000000';
+  static const commandCharacteristic = '6f70656e-546f-4600-000a-000000000000';
 
   // Standard Bluetooth SIG Battery Service / Battery Level.
   static const batteryService = '180f';
@@ -131,4 +143,11 @@ class BleProtocol {
   }
 
   static List<int> encodeName(String name) => utf8.encode(name);
+
+  /// The one-byte payload written to the Command characteristic.
+  static List<int> encodeCommand(SensorCommand command) => [
+    switch (command) {
+      SensorCommand.sleep => 0x01,
+    },
+  ];
 }

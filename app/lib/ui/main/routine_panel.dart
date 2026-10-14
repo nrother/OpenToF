@@ -58,7 +58,8 @@ class RoutinePanel extends StatelessWidget {
         scheme.error,
       ),
       RoutinePhase.running => (
-        l.routineRunning(routine.jumps.length, routine.targetJumps),
+        // The jump in progress (the highlighted row), not the ones done.
+        l.routineRunning(routine.jumps.length + 1, routine.targetJumps),
         scheme.primary,
       ),
       RoutinePhase.complete => (l.routineComplete, Colors.green.shade700),

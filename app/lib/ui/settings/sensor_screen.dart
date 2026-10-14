@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/sensor/sensor.dart';
 import '../../domain/algorithm_metadata.dart';
 import '../../domain/version_check.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
+import '../../state/session.dart';
 import '../format.dart';
 
 /// Everything the paired sensor reports about itself: battery, device
@@ -12,6 +14,44 @@ import '../format.dart';
 /// Opened by tapping the sensor in Settings.
 class SensorScreen extends ConsumerWidget {
   const SensorScreen({super.key});
+
+  /// Asks first, then sends the sensor to deep sleep.
+  static Future<void> _confirmSleep(BuildContext context, WidgetRef ref) async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final session = ref.read(sessionProvider.notifier);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.sleepConfirmTitle),
+        content: Text(l.sleepConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.sleepAction),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await session.sleepSensor();
+      messenger.showSnackBar(SnackBar(content: Text(l.sleepStarted)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(l.sleepFailed('$e'))));
+    }
+  }
+
+  static String _sleepHelp(AppLocalizations l, SessionState session) {
+    if (session.connection == SensorConnectionState.connected) {
+      return l.sleepSensorHelp;
+    }
+    return session.asleep ? l.sleepSensorAsleep : l.sleepSensorNotConnected;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,6 +86,16 @@ class SensorScreen extends ConsumerWidget {
                   ? l.batteryRemainingUnknown
                   : formatRemaining(l, session.batteryRemaining!),
             ),
+            // Hidden for a sensor that cannot do it (older firmware); disabled
+            // with the reason while a sensor that can is not connected.
+            if (session.supportsSleep)
+              ListTile(
+                leading: const Icon(Icons.bedtime_outlined),
+                title: Text(l.sleepSensor),
+                subtitle: Text(_sleepHelp(l, session)),
+                enabled: session.connection == SensorConnectionState.connected,
+                onTap: () => _confirmSleep(context, ref),
+              ),
 
             SettingsSection(l.deviceInfoSection),
             InfoRow(l.manufacturerLabel, info?.manufacturerName),

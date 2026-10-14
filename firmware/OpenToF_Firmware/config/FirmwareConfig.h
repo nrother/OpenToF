@@ -37,8 +37,13 @@
 // press reset), or hold D1 low during a reset to keep it awake.
 #define DEEP_SLEEP_ENABLED 1
 
+// Derived, do not edit: deep sleep needs the IMU as its wake-up source, which the demo does not
+// use.
+#define DEEP_SLEEP_ACTIVE (DEEP_SLEEP_ENABLED && !DEMO_MODE)
+
 // Sleep after this long without a BLE connection and without a takeoff/landing.
-// The device never sleeps while an app is connected.
+// The device never sleeps by itself while an app is connected (the app can send it to sleep with
+// the Command characteristic, see BleUuids.h).
 #define SLEEP_AFTER_IDLE_MS 60000UL
 
 // While asleep, wake up this often for a moment to ask the IMU whether it saw motion. Shorter =
@@ -60,7 +65,7 @@
 // Every string must be at most DIS_STRING_MAX (32) bytes.
 // ============================================================================
 
-#define FIRMWARE_VERSION "0.5.0"    // Firmware Revision String; bump on every release
+#define FIRMWARE_VERSION "0.6.0"    // Firmware Revision String; bump on every release
 #define HARDWARE_REVISION "0.1"     // Hardware Revision String; change with the PCB/board
 #define MANUFACTURER_NAME "OpenToF"
 #define MODEL_NUMBER "OpenToF Sensor"
@@ -79,6 +84,10 @@
 #define BLE_CONN_INTERVAL_MIN 6   // 7.5 ms  (low latency for notifications)
 #define BLE_CONN_INTERVAL_MAX 12  // 15 ms
 #define BLE_ADV_INTERVAL 160      // 100 ms
+
+// After a "sleep" command the connection is kept open this long before the sensor disconnects,
+// so that the response to the app's write still gets out.
+#define BLE_SLEEP_COMMAND_DELAY_MS 200
 
 // ============================================================================
 // Board pins (from the Seeed XIAO MG24 wiki)

@@ -13,11 +13,10 @@ Jump jumpAt(int ms) => Jump(
 
 RoutineMachine startedWith(int jumps) {
   final m = RoutineMachine();
-  final j = jumpAt(0);
   expect(
     m.start(
-      lastJump: j,
-      now: j.landedAt,
+      lastJump: jumpAt(0),
+      now: t0,
       timeout: timeout,
       jumpsPerRoutine: jumps,
     ),
@@ -37,8 +36,9 @@ void main() {
     final m = startedWith(3);
     expect(m.state.targetJumps, 3);
     m.onJump(jumpAt(1000));
-    expect(m.state.phase, RoutinePhase.running);
     m.onJump(jumpAt(2000));
+    expect(m.state.phase, RoutinePhase.running);
+    m.onJump(jumpAt(3000));
     expect(m.state.phase, RoutinePhase.complete);
     expect(m.state.jumps.length, 3);
     expect(m.state.targetJumps, 3);
@@ -47,17 +47,20 @@ void main() {
 
   test('longer routines than 10 work', () {
     final m = startedWith(25);
-    for (var i = 1; i < 24; i++) {
+    for (var i = 1; i < 25; i++) {
       m.onJump(jumpAt(i * 1000));
     }
     expect(m.state.phase, RoutinePhase.running);
-    m.onJump(jumpAt(24000));
+    m.onJump(jumpAt(25000));
     expect(m.state.phase, RoutinePhase.complete);
     expect(m.state.jumps.length, 25);
   });
 
-  test('a routine of 1 completes at Start', () {
+  test('a routine of 1 completes on the first landing after Start', () {
     final m = startedWith(1);
+    expect(m.state.phase, RoutinePhase.running);
+    expect(m.state.jumps, isEmpty);
+    m.onJump(jumpAt(1000));
     expect(m.state.phase, RoutinePhase.complete);
     expect(m.state.jumps.length, 1);
     expect(m.deadline, isNull);

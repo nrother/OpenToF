@@ -2,7 +2,7 @@ name: opentof_app
 description: "OpenToF companion app for trampoline time-of-flight sensor"
 publish_to: 'none'
 
-version: 0.5.0+4
+version: 0.6.0+5
 
 environment:
   sdk: ^3.13.4
@@ -39,6 +39,8 @@ flutter:
     - assets/images/OpenToF_wordmark_dark.png
     - assets/images/OpenToF_mark.png
     - assets/images/OpenToF_mark_dark.png
+    # Copy of ../Changelog.md; refresh with: dart run tool/sync_changelog.dart
+    - assets/changelog/Changelog.md
 
 # Branding (see tool/generate_branding.ps1). Regenerate native files with:
 #   dart run flutter_launcher_icons

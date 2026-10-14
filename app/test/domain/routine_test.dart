@@ -14,17 +14,10 @@ Jump jumpAt(int ms, {int flight = 1000, bool missed = false, int serial = 0}) =>
       missedEvent: missed,
     );
 
-RoutineMachine started({Jump? first}) {
+/// A routine started at [t0], while jumping (last landing 500 ms before).
+RoutineMachine started() {
   final m = RoutineMachine();
-  final j = first ?? jumpAt(0);
-  expect(
-    m.start(
-      lastJump: j,
-      now: j.landedAt.add(const Duration(seconds: 1)),
-      timeout: timeout,
-    ),
-    isTrue,
-  );
+  expect(m.start(lastJump: jumpAt(-500), now: t0, timeout: timeout), isTrue);
   return m;
 }
 
@@ -56,28 +49,30 @@ void main() {
       );
     });
 
-    test('last jump becomes jump #1', () {
-      final m = started(first: jumpAt(0, flight: 1234));
+    test('the jump already landed is not counted; the next landing is #1', () {
+      final m = started();
       expect(m.state.phase, RoutinePhase.running);
-      expect(m.state.jumps.length, 1);
-      expect(m.state.jumps.first.flightMs, 1234);
+      expect(m.state.jumps, isEmpty);
+      m.onJump(jumpAt(800, flight: 1234));
+      expect(m.state.jumps.single.flightMs, 1234);
     });
 
     test('start while running is ignored', () {
       final m = started();
-      final other = jumpAt(500, flight: 999);
+      m.onJump(jumpAt(800));
+      final other = jumpAt(1500, flight: 999);
       expect(
         m.start(lastJump: other, now: other.landedAt, timeout: timeout),
         isFalse,
       );
-      expect(m.state.jumps.first.flightMs, 1000);
+      expect(m.state.jumps.single.flightMs, 1000);
     });
   });
 
   group('running', () {
     test('completes after jump #10 with total and no deadline', () {
       final m = started();
-      for (var i = 1; i < 10; i++) {
+      for (var i = 1; i <= 10; i++) {
         expect(m.state.phase, RoutinePhase.running);
         m.onJump(jumpAt(i * 1000, flight: 1000 + i));
       }
@@ -85,7 +80,7 @@ void main() {
       expect(m.state.jumps.length, 10);
       expect(
         m.state.totalFlightMs,
-        1000 * 10 + (1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9),
+        1000 * 10 + (1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10),
       );
       expect(m.deadline, isNull);
     });
@@ -94,7 +89,7 @@ void main() {
       'routine can complete instantly when jumps arrive in quick succession',
       () {
         final m = started();
-        for (var i = 1; i < 10; i++) {
+        for (var i = 1; i <= 10; i++) {
           m.onJump(jumpAt(i));
         }
         expect(m.state.phase, RoutinePhase.complete);
@@ -109,8 +104,8 @@ void main() {
       expect(m.state.jumps.length, 10);
     });
 
-    test('deadline runs from last landing and resets on each jump', () {
-      final m = started(first: jumpAt(0));
+    test('deadline runs from Start and resets on each jump', () {
+      final m = started();
       expect(m.deadline, t0.add(timeout));
       m.onJump(jumpAt(3000));
       expect(m.deadline, t0.add(const Duration(seconds: 7)));
@@ -124,7 +119,7 @@ void main() {
       m.tick(t0.add(const Duration(milliseconds: 5000)));
       expect(m.state.phase, RoutinePhase.cancelled);
       expect(m.state.cancelReason, CancelReason.inactivity);
-      expect(m.state.jumps.length, 2);
+      expect(m.state.jumps.length, 1);
       expect(m.state.exportable, isTrue);
     });
 
@@ -134,7 +129,7 @@ void main() {
       m.cancel();
       expect(m.state.phase, RoutinePhase.cancelled);
       expect(m.state.cancelReason, CancelReason.user);
-      expect(m.state.jumps.length, 2);
+      expect(m.state.jumps.length, 1);
     });
 
     test('cancel outside running is a no-op', () {
@@ -150,11 +145,11 @@ void main() {
       m.onJump(jumpAt(1000));
       m.setConnected(false);
       expect(m.state.paused, isTrue);
-      expect(m.state.jumps.length, 2);
+      expect(m.state.jumps.length, 1);
       m.setConnected(true);
       expect(m.state.paused, isFalse);
       m.onJump(jumpAt(2000));
-      expect(m.state.jumps.length, 3);
+      expect(m.state.jumps.length, 2);
     });
 
     test('inactivity timer keeps running while disconnected', () {
@@ -180,7 +175,7 @@ void main() {
       m.cancel();
       m.tick(t0.add(const Duration(minutes: 5)));
       expect(m.state.phase, RoutinePhase.cancelled);
-      expect(m.state.jumps.length, 2);
+      expect(m.state.jumps.length, 1);
 
       final fresh = jumpAt(600000, flight: 777);
       expect(
@@ -188,29 +183,30 @@ void main() {
         isTrue,
       );
       expect(m.state.phase, RoutinePhase.running);
-      expect(m.state.jumps.single.flightMs, 777);
+      expect(m.state.jumps, isEmpty);
       expect(m.state.cancelReason, isNull);
     });
 
     test('a new routine can start after completion', () {
       final m = started();
-      for (var i = 1; i < 10; i++) {
+      for (var i = 1; i <= 10; i++) {
         m.onJump(jumpAt(i * 100));
       }
+      expect(m.state.phase, RoutinePhase.complete);
       final fresh = jumpAt(60000);
       expect(
         m.start(lastJump: fresh, now: fresh.landedAt, timeout: timeout),
         isTrue,
       );
-      expect(m.state.jumps.length, 1);
+      expect(m.state.jumps, isEmpty);
     });
 
-    test(
-      'cancelled with zero jumps is not possible; idle is not exportable',
-      () {
-        expect(RoutineState.idle.exportable, isFalse);
-      },
-    );
+    test('cancelled with zero jumps and idle are not exportable', () {
+      expect(RoutineState.idle.exportable, isFalse);
+      final m = started()..cancel();
+      expect(m.state.phase, RoutinePhase.cancelled);
+      expect(m.state.exportable, isFalse);
+    });
   });
 
   test('missed event on any jump is surfaced on the routine', () {
@@ -232,7 +228,8 @@ void main() {
 
   group('sensor corrections', () {
     test('replaceJump updates values by serial, also after completion', () {
-      final m = started(first: jumpAt(0, serial: 1));
+      final m = started();
+      m.onJump(jumpAt(0, serial: 1));
       m.onJump(jumpAt(1500, serial: 2, flight: 1100));
       m.replaceJump(jumpAt(1500, serial: 2, flight: 1050));
       expect(m.state.jumps.map((j) => j.flightMs), [1000, 1050]);
@@ -245,22 +242,29 @@ void main() {
     });
 
     test('removeJump drops a retracted jump and moves the deadline back', () {
-      final m = started(first: jumpAt(0, serial: 1));
-      m.onJump(jumpAt(1500, serial: 2));
+      final m = started();
+      m.onJump(jumpAt(1000, serial: 1));
+      m.onJump(jumpAt(2500, serial: 2));
       m.removeJump(2);
       expect(m.state.jumps.map((j) => j.serial), [1]);
+      expect(m.deadline, t0.add(const Duration(seconds: 5)));
+    });
+
+    test('removeJump can remove jump #1; the deadline falls back to Start', () {
+      final m = started();
+      m.onJump(jumpAt(1000, serial: 1));
+      m.removeJump(1);
+      expect(m.state.jumps, isEmpty);
+      expect(m.state.phase, RoutinePhase.running);
       expect(m.deadline, t0.add(timeout));
     });
 
-    test('removeJump never removes the first jump or touches a finished '
-        'routine', () {
-      final m = started(first: jumpAt(0, serial: 1));
+    test('removeJump does not touch a finished routine', () {
+      final m = started();
+      m.onJump(jumpAt(1000, serial: 1));
+      m.cancel();
       m.removeJump(1);
       expect(m.state.jumps, hasLength(1));
-      m.onJump(jumpAt(1500, serial: 2));
-      m.cancel();
-      m.removeJump(2);
-      expect(m.state.jumps, hasLength(2));
     });
   });
 }

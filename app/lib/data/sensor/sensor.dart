@@ -90,6 +90,16 @@ abstract class Sensor {
   /// [AlgorithmMetadata.none].
   Future<AlgorithmMetadata> readAlgorithmMetadata();
 
+  /// Whether the connected sensor can be sent to deep sleep with [sleep]
+  /// (older firmware cannot). Only meaningful while connected.
+  bool get supportsSleep;
+
+  /// Sends the sensor to deep sleep. It drops the connection and stays
+  /// invisible until it is shaken or hit; the automatic reconnect of [connect]
+  /// then picks it up again. Throws if the sensor is not connected or does not
+  /// support it.
+  Future<void> sleep();
+
   /// Releases all resources. The sensor must not be used afterwards.
   Future<void> dispose();
 }

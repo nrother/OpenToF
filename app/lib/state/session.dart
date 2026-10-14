@@ -26,6 +26,8 @@ class SessionState {
     this.chartFrozenAt,
     this.algorithm = AlgorithmMetadata.none,
     this.sensorInfo,
+    this.supportsSleep = false,
+    this.asleep = false,
   });
 
   final SensorConnectionState connection;
@@ -55,6 +57,14 @@ class SessionState {
   /// or if the sensor doesn't expose it.
   final SensorInfo? sensorInfo;
 
+  /// Whether the sensor could be sent to deep sleep when it was last
+  /// connected (false until the first connection and for older firmware).
+  final bool supportsSleep;
+
+  /// True after the app sent the sensor to sleep, until it is connected
+  /// again. The sensor is then expected to be gone, not a lost connection.
+  final bool asleep;
+
   SessionState copyWith({
     SensorConnectionState? connection,
     int? batteryLevel,
@@ -70,6 +80,8 @@ class SessionState {
     bool clearChartFrozen = false,
     AlgorithmMetadata? algorithm,
     SensorInfo? sensorInfo,
+    bool? supportsSleep,
+    bool? asleep,
   }) => SessionState(
     connection: connection ?? this.connection,
     batteryLevel: batteryLevel ?? this.batteryLevel,
@@ -85,6 +97,8 @@ class SessionState {
         : (chartFrozenAt ?? this.chartFrozenAt),
     algorithm: algorithm ?? this.algorithm,
     sensorInfo: sensorInfo ?? this.sensorInfo,
+    supportsSleep: supportsSleep ?? this.supportsSleep,
+    asleep: asleep ?? this.asleep,
   );
 }
 
@@ -164,13 +178,16 @@ class SessionController extends Notifier<SessionState> {
   // ---- sensor events ----
 
   void _onConnection(SensorConnectionState c) {
-    _machine.setConnected(c == SensorConnectionState.connected);
+    final connected = c == SensorConnectionState.connected;
+    _machine.setConnected(connected);
     state = state.copyWith(
       connection: c,
       routine: _machine.state,
       events: _withConnectionEvent(c),
+      supportsSleep: connected ? _sensor?.supportsSleep : null,
+      asleep: connected ? false : null,
     );
-    if (c == SensorConnectionState.connected) {
+    if (connected) {
       unawaited(_refreshName());
       unawaited(_refreshDeviceInfo());
       unawaited(_refreshAlgorithm());
@@ -385,18 +402,11 @@ class SessionController extends Notifier<SessionState> {
       jumpsPerRoutine: settings.jumpsPerRoutine,
     );
     if (started) {
-      final at = _now();
+      // No sound here: jump #1 is the one in progress, it beeps on landing.
       state = state.copyWith(
         routine: _machine.state,
-        events: _appendEvent(ChartEventType.routineStarted, at),
+        events: _appendEvent(ChartEventType.routineStarted, _now()),
       );
-      if (_machine.state.phase != RoutinePhase.running) {
-        // E.g. a 1-jump routine completes immediately at Start.
-        state = state.copyWith(
-          events: _appendEvent(ChartEventType.routineStopped, at),
-        );
-      }
-      _playFor(1, _machine.state.targetJumps);
     }
     return started;
   }
@@ -422,6 +432,16 @@ class SessionController extends Notifier<SessionState> {
   void resumeChart() => state = state.copyWith(clearChartFrozen: true);
 
   // ---- device ----
+
+  /// Sends the connected sensor to deep sleep. It disconnects by itself; the
+  /// sensor connection keeps retrying and finds it again once it is woken.
+  Future<void> sleepSensor() async {
+    final sensor = _sensor;
+    if (sensor == null) return;
+    await sensor.sleep();
+    if (!ref.mounted) return;
+    state = state.copyWith(asleep: true);
+  }
 
   Future<void> renameDevice(String name) async {
     final sensor = _sensor;

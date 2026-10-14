@@ -9,8 +9,10 @@ import '../../data/sensor/sensor.dart';
 import '../../data/settings_repository.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
+import '../../state/session.dart';
 import '../brand_logo.dart';
 import '../main/jump_details.dart';
+import 'changelog_screen.dart';
 import 'led_help_screen.dart';
 import 'sensor_screen.dart';
 
@@ -111,6 +113,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => const LedHelpScreen()));
 
+  void _openChangelog() => Navigator.of(context)
+      .push(MaterialPageRoute<void>(builder: (_) => const ChangelogScreen()));
+
   void _unpair() {
     ref.read(settingsProvider.notifier).unpair();
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -146,7 +151,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       settings.pairedDeviceName ??
                       l.unnamedSensor,
                 ),
-                subtitle: Text(_connectionText(l, session.connection)),
+                subtitle: Text(_connectionText(l, session)),
                 onTap: _openSensor,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -336,7 +341,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SettingsSection(l.aboutSection),
             ListTile(
               title: Text(l.appVersionLabel),
-              trailing: Text(ref.watch(appVersionProvider)),
+              subtitle: Text(l.changelogTileHelp),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(ref.watch(appVersionProvider)),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              onTap: _openChangelog,
             ),
             if (defaultTargetPlatform == TargetPlatform.android)
               ListTile(
@@ -361,9 +375,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  String _connectionText(AppLocalizations l, SensorConnectionState c) =>
-      switch (c) {
+  String _connectionText(AppLocalizations l, SessionState session) =>
+      switch (session.connection) {
         SensorConnectionState.connected => l.connectionConnected,
+        _ when session.asleep => l.connectionAsleep,
         SensorConnectionState.connecting => l.connectionConnecting,
         SensorConnectionState.disconnected => l.connectionDisconnected,
       };
@@ -523,6 +538,7 @@ class _SimulatorControls extends ConsumerWidget {
             onPressed: mock.simulateReconnect,
             child: Text(l.simReconnect),
           ),
+          FilledButton.tonal(onPressed: mock.wake, child: Text(l.simWake)),
         ],
       ),
     );

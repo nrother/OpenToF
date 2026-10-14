@@ -47,7 +47,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get startDisabledHint =>
-      'Der Start ist möglich, solange du springst: Der gerade gemachte Sprung zählt als Sprung 1.';
+      'Der Start ist möglich, solange du springst: Der Sprung, in dem du gerade bist, zählt als Sprung 1.';
 
   @override
   String get routineTitle => 'Routine';
@@ -524,7 +524,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledHelpIntro =>
-      'Der Sensor hat zwei kleine Lichter. Das orange zeigt, was der Sensor gerade tut. Die Balken unten zeigen jedes Signal über etwa zwei Sekunden: Orange bedeutet, das Licht ist an.';
+      'Der Sensor hat ein oranges und ein rotes Licht. Beide sitzen direkt nebeneinander im selben winzigen Bauteil und sind deshalb leicht zu verwechseln. Das orange zeigt, was der Sensor gerade tut, das rote gehört zum Laden. Die Balken unten zeigen jedes Signal über etwa zwei Sekunden: Der farbige Teil bedeutet, das Licht ist an.';
 
   @override
   String get ledOrangeSection => 'Oranges Licht';
@@ -590,9 +590,106 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Sensor konnte nicht starten und funktioniert nicht. Reset-Taste am Sensor drücken oder die Stromversorgung trennen und wieder verbinden.';
 
   @override
-  String get ledRedSection => 'Rotes Licht';
+  String get ledRedSection => 'Rotes Licht (Laden)';
 
   @override
   String get ledRedBody =>
-      'Das rote Licht gehört zur Ladeelektronik, nicht zur Sensor-Software. Es kann leuchten oder blinken, solange der Sensor per USB angeschlossen ist. Über die Verbindung zur App sagt es nichts aus.';
+      'Das rote Licht gehört zum Ladechip, nicht zur Sensor-Software. Es funktioniert nur, solange der Sensor per USB angeschlossen ist: Im Akkubetrieb ist es immer aus. Über die Verbindung zur App sagt es nichts aus.';
+
+  @override
+  String get ledChargingTitle => 'Kurzes Aufblitzen etwa einmal pro Sekunde';
+
+  @override
+  String get ledChargingTiming => '0,16 s an, 1,12 s aus, fortlaufend';
+
+  @override
+  String get ledChargingMeaning =>
+      'Der Akku wird geladen. Der letzte Teil des Ladens geht langsam: Das Licht kann noch eine halbe Stunde oder länger blitzen, während die App schon über 90 % anzeigt.';
+
+  @override
+  String get ledChargedTitle => 'Knapp eine Minute an, dann aus';
+
+  @override
+  String get ledChargedTiming => 'Dauerlicht für etwa 50 s';
+
+  @override
+  String get ledChargedMeaning =>
+      'Der Akku ist voll. Danach bleibt das Licht aus, obwohl USB weiter angeschlossen ist.';
+
+  @override
+  String get ledChargeOffTitle => 'Aus trotz USB-Anschluss';
+
+  @override
+  String get ledChargeOffTiming => 'Kein Licht';
+
+  @override
+  String get ledChargeOffMeaning =>
+      'Meistens ist der Akku voll. Wurde der Sensor gerade erst angeschlossen und das rote Licht ging gar nicht an, Kabel und Stromquelle prüfen. Später kann das Licht wieder blitzen, wenn der Ladechip den Akku nachlädt.';
+
+  @override
+  String get ledRedSource =>
+      'Diese Signale stammen aus dem Datenblatt des Ladechips. An unseren eigenen Sensoren wurde bisher nur das Blitzen beim Laden beobachtet, die beiden anderen können also leicht abweichen. Die App kann nicht anzeigen, ob der Sensor lädt, weil die Sensor-Software dieses Licht nicht auslesen kann.';
+
+  @override
+  String get connectionAsleep => 'Sensor schläft';
+
+  @override
+  String get sleepSensor => 'Sensor schlafen legen';
+
+  @override
+  String get sleepSensorHelp =>
+      'Spart Akku, bis du den Sensor wieder brauchst.';
+
+  @override
+  String get sleepSensorNotConnected =>
+      'Nur möglich, solange der Sensor verbunden ist.';
+
+  @override
+  String get sleepSensorAsleep =>
+      'Der Sensor schläft. Zum Aufwecken schütteln oder anstoßen; die App verbindet sich dann von selbst.';
+
+  @override
+  String get sleepConfirmTitle => 'Sensor schlafen legen?';
+
+  @override
+  String get sleepConfirmBody =>
+      'Der Sensor trennt die Verbindung, blinkt 6-mal und schläft, bis er bewegt wird.\n\nZum Aufwecken schütteln oder anstoßen: Er reagiert innerhalb von etwa 4 Sekunden, und die App verbindet sich von selbst wieder.';
+
+  @override
+  String get sleepAction => 'Schlafen legen';
+
+  @override
+  String get sleepStarted =>
+      'Der Sensor schläft ein. Zum Aufwecken schütteln oder anstoßen.';
+
+  @override
+  String sleepFailed(String message) {
+    return 'Der Sensor konnte nicht schlafen gelegt werden: $message';
+  }
+
+  @override
+  String get simWake => 'Aufwecken simulieren';
+
+  @override
+  String get changelogTileHelp => 'Änderungen anzeigen';
+
+  @override
+  String get changelogTitle => 'Änderungen';
+
+  @override
+  String get changelogAppTab => 'App';
+
+  @override
+  String get changelogFirmwareTab => 'Sensor-Firmware';
+
+  @override
+  String get changelogLanguageNote =>
+      'Die Änderungshinweise gibt es nur auf Englisch.';
+
+  @override
+  String get changelogAbout => 'Zu den Versionsnummern';
+
+  @override
+  String get changelogLoadFailed =>
+      'Die Änderungen konnten nicht geladen werden.';
 }

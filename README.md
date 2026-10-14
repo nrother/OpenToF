@@ -26,8 +26,8 @@ never change the measured times.
 ## Features
 
 - Live flight time of the last jump, a chart of recent jumps, optional time on bed and total jump time.
-- Routines with a configurable number of jumps: start on the jump you just made, a beep per jump and a final sound,
-  automatic stop after inactivity.
+- Routines with a configurable number of jumps: press Start while jumping and the jump in progress counts as #1,
+  a beep per jump and a final sound, automatic stop after inactivity.
 - CSV export of a routine or of the last 30 s / 1 min / 5 min of jumps.
 - Missed and uncertain jumps are flagged; optional extra per-jump values from the detection algorithm
   (confidence, landing and push-off intensity, …).

@@ -111,4 +111,39 @@ void main() {
     expect(info.softwareRevision, isNotNull);
     expect((await s.readSensorInfo())!.protocol, 1);
   });
+
+  test('sleep disconnects until wake, which looks like a restart', () async {
+    final states = <SensorConnectionState>[];
+    s.connectionState.listen(states.add);
+    final bootCount = (await s.readSensorInfo())!.bootCount;
+    s.emitJump();
+
+    await s.sleep();
+    await Future<void>.delayed(Duration.zero);
+    expect(s.isAsleep, isTrue);
+    expect(states, [SensorConnectionState.disconnected]);
+
+    s.simulateReconnect(); // asleep: nothing to connect to
+    expect(s.currentConnectionState, SensorConnectionState.disconnected);
+
+    s.wake();
+    await Future<void>.delayed(Duration.zero);
+    expect(s.isAsleep, isFalse);
+    expect(states.last, SensorConnectionState.connected);
+    expect((await s.readSensorInfo())!.bootCount, bootCount + 1);
+
+    events.clear();
+    s.emitJump();
+    await Future<void>.delayed(Duration.zero);
+    expect(events.first.jumpId, 1); // jump ids start over
+  });
+
+  test('sleep is refused while disconnected or unsupported', () async {
+    s.supportsSleep = false;
+    await expectLater(s.sleep(), throwsStateError);
+    s.supportsSleep = true;
+    s.simulateDisconnect();
+    await expectLater(s.sleep(), throwsStateError);
+    expect(s.isAsleep, isFalse);
+  });
 }

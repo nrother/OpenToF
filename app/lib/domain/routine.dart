@@ -52,17 +52,20 @@ class RoutineState {
 /// clock, so it is fully deterministic; the owner drives [tick] from a timer.
 ///
 /// Rules (see docs/DECISIONS.md):
-/// - Start needs a last jump that landed within the inactivity timeout; that
-///   jump becomes #1 and the inactivity deadline runs from its landing.
+/// - Start needs a last jump that landed within the inactivity timeout (the
+///   athlete is jumping). The jump in progress at Start, i.e. the first
+///   landing after it, becomes #1; the inactivity deadline runs from Start.
 /// - Every new jump resets the deadline; passing it cancels the routine.
 /// - A disconnect only sets `paused`; the deadline keeps running.
 /// - Complete/cancelled state stays until the next successful [start].
-/// - The jump count is chosen at [start]; a routine of 1 completes right away.
+/// - The jump count is chosen at [start]; a routine of 1 completes on the
+///   first landing after Start.
 class RoutineMachine {
   static const defaultJumpsPerRoutine = 10;
 
   RoutineState _state = RoutineState.idle;
   Duration _timeout = Duration.zero;
+  DateTime? _startedAt;
   DateTime? _deadline;
 
   RoutineState get state => _state;
@@ -86,12 +89,10 @@ class RoutineMachine {
     if (_state.phase == RoutinePhase.running) return false;
     if (!canStart(lastJump: lastJump, now: now, timeout: timeout)) return false;
     _timeout = timeout;
-    _deadline = lastJump!.landedAt.add(timeout);
-    final complete = jumpsPerRoutine <= 1;
-    if (complete) _deadline = null;
+    _startedAt = now;
+    _deadline = now.add(timeout);
     _state = RoutineState(
-      phase: complete ? RoutinePhase.complete : RoutinePhase.running,
-      jumps: [lastJump],
+      phase: RoutinePhase.running,
       targetJumps: jumpsPerRoutine,
     );
     return true;
@@ -124,15 +125,16 @@ class RoutineMachine {
     _state = _state.copyWith(jumps: jumps);
   }
 
-  /// Removes a jump the sensor retracted. Only while running, and never the
-  /// routine's first jump (Start was pressed on it); the inactivity deadline
-  /// then runs from the remaining last jump.
+  /// Removes a jump the sensor retracted. Only while running; the inactivity
+  /// deadline then runs from the remaining last jump (or from Start).
   void removeJump(int serial) {
     if (_state.phase != RoutinePhase.running) return;
     final i = _state.jumps.indexWhere((j) => j.serial == serial);
-    if (i <= 0) return;
+    if (i < 0) return;
     final jumps = [..._state.jumps]..removeAt(i);
-    _deadline = jumps.last.landedAt.add(_timeout);
+    _deadline = (jumps.isEmpty ? _startedAt! : jumps.last.landedAt).add(
+      _timeout,
+    );
     _state = _state.copyWith(jumps: jumps);
   }
 

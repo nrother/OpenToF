@@ -45,17 +45,21 @@ void main() {
     tester,
   ) async {
     final h = await AppHarness.launch(tester);
-    await h.jump(flightMs: 1234);
+    await h.jump(flightMs: 999); // landed before Start: not counted
     await tester.tap(h.startButton);
     await tester.pump();
 
     expect(find.text('Jump 1 of 10'), findsOneWidget);
-    expect(h.audio.jumpBeeps, 1); // jump #1 beeps at Start
+    expect(h.audio.jumpBeeps, 0); // Start itself is silent
+
+    await h.jump(flightMs: 1234); // jump #1: the one in progress at Start
+    expect(find.text('Jump 2 of 10'), findsOneWidget);
+    expect(h.audio.jumpBeeps, 1);
 
     for (var i = 2; i <= 9; i++) {
       await h.jump();
     }
-    expect(find.text('Jump 9 of 10'), findsOneWidget);
+    expect(find.text('Jump 10 of 10'), findsOneWidget);
     expect(h.audio.jumpBeeps, 9);
     expect(h.audio.finalBeeps, 0);
 
@@ -81,6 +85,7 @@ void main() {
     await h.jump();
     await tester.tap(h.startButton);
     await tester.pump();
+    await h.jump();
     await h.jump();
 
     await h.advance(const Duration(seconds: 5));
@@ -170,7 +175,7 @@ void main() {
     expect(s.lastJump!.isFinal, isTrue);
     expect(s.routine.jumps.last.flightMs, 1100);
     expect(s.history.last.flightMs, 1100);
-    expect(s.routine.jumps, hasLength(2));
+    expect(s.routine.jumps, hasLength(1));
     expect(h.audio.jumpBeeps, beepsAfterStart + 1); // no second beep
     expect(find.text('1.100 s'), findsWidgets);
   });
@@ -189,7 +194,7 @@ void main() {
     h.mock.retractLanding();
     await h.advance(const Duration(milliseconds: 50));
     final s = container(tester).read(sessionProvider);
-    expect(s.routine.jumps, hasLength(1));
+    expect(s.routine.jumps, isEmpty); // jump #1 can be retracted too
     expect(s.history, hasLength(1));
     expect(s.lastJump!.flightMs, 1234);
     expect(find.text('Jump 1 of 10'), findsOneWidget);
@@ -207,6 +212,7 @@ void main() {
 
     await tester.tap(h.startButton);
     await tester.pump();
+    await h.jump(flightMs: 1100);
     expect(find.text('Bed (s)'), findsOneWidget);
     expect(find.text('Bed+Flight (s)'), findsOneWidget);
     expect(find.text('1.300'), findsOneWidget); // table cell, unit in header
@@ -288,6 +294,7 @@ void main() {
 
       await tester.tap(h.startButton);
       await tester.pump();
+      await h.jump(flightMs: 1234);
       expect(find.text('Confidence (%)'), findsOneWidget); // table column
       await tester.tap(find.text('1.234').first); // row 1 (last = total row)
       await expectSheet();
@@ -362,7 +369,7 @@ void main() {
     await h.jump();
     await tester.tap(h.startButton);
     await tester.pump();
-    for (var i = 2; i <= 10; i++) {
+    for (var i = 1; i <= 10; i++) {
       await h.jump();
     }
     expect(h.audio.jumpBeeps, 0);
@@ -374,7 +381,7 @@ void main() {
     await h.jump();
     await tester.tap(h.startButton);
     await tester.pump();
-    for (var i = 2; i <= 10; i++) {
+    for (var i = 1; i <= 10; i++) {
       await h.jump();
     }
     expect(h.audio.jumpBeeps, 9);
@@ -404,10 +411,12 @@ void main() {
       await tester.tap(h.startButton);
       await tester.pump();
       expect(find.text('Jump 1 of 3'), findsOneWidget);
-      expect(h.audio.jumpBeeps, 1);
+      expect(h.audio.jumpBeeps, 0);
 
       await h.jump();
       expect(find.text('Jump 2 of 3'), findsOneWidget);
+      await h.jump();
+      expect(find.text('Jump 3 of 3'), findsOneWidget);
       await h.jump();
       expect(find.text('Routine complete'), findsOneWidget);
       expect(h.audio.jumpBeeps, 2);
@@ -415,13 +424,15 @@ void main() {
     },
   );
 
-  testWidgets('a 1-jump routine completes at Start with only the final sound', (
-    tester,
-  ) async {
+  testWidgets('a 1-jump routine completes on the next landing with only the '
+      'final sound', (tester) async {
     final h = await AppHarness.launch(tester, prefs: {'jumps_per_routine': 1});
     await h.jump();
     await tester.tap(h.startButton);
     await tester.pump();
+    expect(find.text('Jump 1 of 1'), findsOneWidget);
+    expect(h.audio.finalBeeps, 0);
+    await h.jump();
     expect(find.text('Routine complete'), findsOneWidget);
     expect(h.audio.jumpBeeps, 0);
     expect(h.audio.finalBeeps, 1);
@@ -438,6 +449,7 @@ void main() {
     ProviderScope.containerOf(tester.element(find.byType(MaterialApp)))
         .read(settingsProvider.notifier)
         .setJumpsPerRoutine(5);
+    await h.jump();
     await h.jump();
     await h.jump();
     expect(find.text('Routine complete'), findsOneWidget);
@@ -554,6 +566,7 @@ void main() {
       expect(find.text('Routine started'), findsOneWidget);
 
       await h.jump();
+      await h.jump();
       await h.advance(const Duration(milliseconds: 300));
       expect(types(), [
         ChartEventType.connected,
@@ -598,7 +611,7 @@ void main() {
       ]);
     });
 
-    testWidgets('a 1-jump routine marks both start and stop at once', (
+    testWidgets('a 1-jump routine marks stop on its first landing', (
       tester,
     ) async {
       final h = await AppHarness.launch(
@@ -608,6 +621,11 @@ void main() {
       await h.jump();
       await tester.tap(h.startButton);
       await tester.pump();
+      expect(
+        container(tester).read(sessionProvider).events.map((e) => e.type),
+        [ChartEventType.connected, ChartEventType.routineStarted],
+      );
+      await h.jump();
       expect(
         container(tester).read(sessionProvider).events.map((e) => e.type),
         [
@@ -659,7 +677,12 @@ void main() {
 
       h.mock.emitJump(flightMs: 2600, contactMs: 200);
       await h.advance(const Duration(milliseconds: 100));
-      expect(find.text('Jump 1 of 2'), findsOneWidget); // still waiting for #2
+      await h.jump();
+      expect(find.text('Jump 2 of 2'), findsOneWidget);
+
+      h.mock.emitJump(flightMs: 2600, contactMs: 200);
+      await h.advance(const Duration(milliseconds: 100));
+      expect(find.text('Jump 2 of 2'), findsOneWidget); // still waiting for #2
 
       await h.jump();
       expect(find.text('Routine complete'), findsOneWidget);

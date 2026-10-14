@@ -5,8 +5,10 @@ import 'sensor_screen.dart';
 
 /// Help page: what the LEDs on the sensor mean. Opened from Settings.
 ///
-/// The signals and their timings are those of the sensor firmware; keep this
-/// page in sync with the "LED status" table in `firmware/README.md`.
+/// The orange signals and their timings are those of the sensor firmware; keep
+/// them in sync with the "LED status" table in `firmware/README.md`. The red
+/// signals are those of the board's charger chip (SGM40567, status pin nCHG):
+/// the firmware has no part in them.
 class LedHelpScreen extends StatelessWidget {
   const LedHelpScreen({super.key});
 
@@ -41,6 +43,15 @@ class LedHelpScreen extends StatelessWidget {
     (100, true), (100, false), (100, true), (100, false), (100, true),
     (100, false), (100, true), (100, false), (100, true), (100, false),
   ];
+  // Charger: one indication period is 1280 ms, lit for an eighth of it.
+  static const _charging = [
+    (160, true),
+    (1120, false),
+    (160, true),
+    (560, false),
+  ];
+  static const _charged = [(2000, true)];
+  static const _chargeOff = [(2000, false)];
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +102,28 @@ class LedHelpScreen extends StatelessWidget {
             ),
             SettingsSection(l.ledRedSection),
             _Paragraph(l.ledRedBody),
+            _Signal(
+              pattern: _charging,
+              color: Colors.red,
+              title: l.ledChargingTitle,
+              timing: l.ledChargingTiming,
+              meaning: l.ledChargingMeaning,
+            ),
+            _Signal(
+              pattern: _charged,
+              color: Colors.red,
+              title: l.ledChargedTitle,
+              timing: l.ledChargedTiming,
+              meaning: l.ledChargedMeaning,
+            ),
+            _Signal(
+              pattern: _chargeOff,
+              color: Colors.red,
+              title: l.ledChargeOffTitle,
+              timing: l.ledChargeOffTiming,
+              meaning: l.ledChargeOffMeaning,
+            ),
+            _Paragraph(l.ledRedSource),
           ],
         ),
       ),
@@ -118,9 +151,13 @@ class _Signal extends StatelessWidget {
     required this.title,
     required this.timing,
     required this.meaning,
+    this.color = Colors.orange,
   });
 
   final List<(int, bool)> pattern;
+
+  /// Colour of the light this signal belongs to.
+  final Color color;
   final String title;
   final String timing;
   final String meaning;
@@ -135,7 +172,7 @@ class _Signal extends StatelessWidget {
         children: [
           Text(title, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
-          _PatternStrip(pattern),
+          _PatternStrip(pattern, color),
           const SizedBox(height: 6),
           Text(
             timing,
@@ -151,11 +188,12 @@ class _Signal extends StatelessWidget {
   }
 }
 
-/// The blink pattern as a bar: time runs left to right, orange = LED on.
+/// The blink pattern as a bar: time runs left to right, coloured = LED on.
 class _PatternStrip extends StatelessWidget {
-  const _PatternStrip(this.pattern);
+  const _PatternStrip(this.pattern, this.color);
 
   final List<(int, bool)> pattern;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +209,7 @@ class _PatternStrip extends StatelessWidget {
                 Expanded(
                   flex: ms,
                   child: ColoredBox(
-                    color: on ? Colors.orange : off,
+                    color: on ? color : off,
                     child: const SizedBox.expand(),
                   ),
                 ),

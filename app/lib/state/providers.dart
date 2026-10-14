@@ -10,6 +10,7 @@ import '../data/foreground_service.dart';
 import '../data/sensor/mock_sensor.dart';
 import '../data/sensor/sensor.dart';
 import '../data/settings_repository.dart';
+import '../domain/changelog.dart';
 import 'session.dart';
 
 /// Time source for the whole app; overridden in tests.
@@ -23,6 +24,14 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
 /// Human-readable app version (e.g. "1.0.0 (1)"); must be overridden in `main()`.
 final appVersionProvider = Provider<String>(
   (ref) => throw UnimplementedError('appVersionProvider not overridden'),
+);
+
+/// The project changelog shown under Settings → Version. The asset is a copy
+/// of the repository's `Changelog.md` (`tool/sync_changelog.dart`).
+final changelogProvider = FutureProvider<Changelog>(
+  (ref) async => Changelog.parse(
+    await rootBundle.loadString('assets/changelog/Changelog.md'),
+  ),
 );
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(

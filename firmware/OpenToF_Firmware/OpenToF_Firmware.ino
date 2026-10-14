@@ -30,7 +30,7 @@
  *     BatteryMonitor.h      battery measurement
  *     DeviceName.h          device name in flash + validation
  *     BootCounter.h         boot counter in flash (lets the app notice a restarted clock)
- *     DeepSleep.h           deep sleep when idle, wake-up on motion
+ *     DeepSleep.h           deep sleep (when idle or on command), wake-up on motion
  *     Logging.h, Micros64.h helpers
  *
  * Includes are relative to the including file: this .ino uses "core/Logging.h", headers use
@@ -116,15 +116,11 @@ static void updateStatusLed() {
 }
 
 #if DEEP_SLEEP_ACTIVE
-// Goes to deep sleep after SLEEP_AFTER_IDLE_MS without a BLE connection and without a
-// takeoff/landing (`activity`). Call every loop().
-static void sleepWhenIdle(bool activity) {
-  static uint32_t lastActiveMs = 0;
-  if (activity || bleConnected()) lastActiveMs = millis();
-  if (millis() - lastActiveMs < SLEEP_AFTER_IDLE_MS) return;
-  lastActiveMs = millis();
-
-  LOG("Idle, going to deep sleep");
+// Goes to deep sleep now; a connected app is disconnected first. Returns only if the IMU could
+// not be set up as the wake-up source: the device then keeps running (the next blePoll()
+// advertises again if an app was connected).
+static void sleepNow() {
+  bleDisconnect();
   flushDeviceName();
   if (!imuSource.armWakeOnMotion()) {
     // Without a working wake-up source the device would sleep forever: stay awake instead.
@@ -145,6 +141,23 @@ static void sleepWhenIdle(bool activity) {
   Serial.flush();
 #endif
   deepSleepEnter();
+}
+
+// Goes to deep sleep when the app asks for it, or after SLEEP_AFTER_IDLE_MS without a BLE
+// connection and without a takeoff/landing (`activity`). Call every loop().
+static void sleepWhenIdleOrAsked(bool activity) {
+  static uint32_t lastActiveMs = 0;
+  if (activity || bleConnected()) lastActiveMs = millis();
+
+  if (bleTakeSleepRequest()) {
+    LOG("Sleep command, going to deep sleep");
+  } else if (millis() - lastActiveMs >= SLEEP_AFTER_IDLE_MS) {
+    LOG("Idle, going to deep sleep");
+  } else {
+    return;
+  }
+  sleepNow();
+  lastActiveMs = millis();  // still awake (no wake-up source): try again after a full idle time
 }
 #endif
 
@@ -218,6 +231,6 @@ void loop() {
   updateStatusLed();
 
 #if DEEP_SLEEP_ACTIVE
-  sleepWhenIdle(activity);
+  sleepWhenIdleOrAsked(activity);
 #endif
 }

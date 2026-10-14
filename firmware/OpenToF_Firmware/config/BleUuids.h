@@ -13,6 +13,10 @@
 //     Reasons          Read        JSON array naming the reason bits
 //     Confidence kind  Read        "none" | "heuristic" | "calibrated"
 //     Name             Read/Write  UTF-8, 1..NAME_MAX_BYTES bytes, stored in flash
+//     Command          Write       u8: 1 = go to deep sleep now, anything else is ignored.
+//                                  Only present if the build can sleep (DEEP_SLEEP_ACTIVE); the
+//                                  app tells by its presence. The sensor disconnects and sleeps
+//                                  until it is shaken.
 //   The algorithm's name stays in the Device Information service (Software Revision String).
 //   Removed in protocol 1: Landing (...0002...) and Takeoff (...0003...); do not reuse them.
 //
@@ -38,6 +42,10 @@
 #define UUID_FIELDS "6f70656e-546f-4600-0007-000000000000"
 #define UUID_REASONS "6f70656e-546f-4600-0008-000000000000"
 #define UUID_CONFIDENCE_KIND "6f70656e-546f-4600-0009-000000000000"
+#define UUID_COMMAND "6f70656e-546f-4600-000a-000000000000"
+
+// Values of the Command characteristic.
+#define COMMAND_SLEEP 0x01
 
 // Human-readable descriptions of the custom characteristics. They are sent as GATT
 // "Characteristic User Description" descriptors (0x2901), which scanner apps such as
@@ -51,6 +59,7 @@
 #define DESC_REASONS "Reason bit names (JSON)"
 #define DESC_CONFIDENCE_KIND "Confidence kind"
 #define DESC_NAME "Device name (UTF-8, writable)"
+#define DESC_COMMAND "Command (1 = sleep)"
 
 // ============================================================================
 // Bluetooth SIG assigned 16-bit UUIDs (Assigned Numbers, bluetooth.com)

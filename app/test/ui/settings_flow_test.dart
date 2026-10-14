@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opentof_app/ui/brand_logo.dart';
+import 'package:opentof_app/ui/main/status_indicators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'harness.dart';
@@ -41,7 +42,11 @@ void main() {
     expect(find.text('Off'), findsOneWidget);
     expect(find.text('3 short blinks, then slow blinking'), findsOneWidget);
     expect(find.text('Fast blinking that does not stop'), findsOneWidget);
-    expect(find.text('Red light'), findsOneWidget);
+    expect(find.text('Red light (charging)'), findsOneWidget);
+    expect(find.text('Short flash about once a second'), findsOneWidget);
+    expect(find.text('0.16 s on, 1.12 s off, repeating'), findsOneWidget);
+    expect(find.text('On for just under a minute, then off'), findsOneWidget);
+    expect(find.text('Off while plugged in'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -49,7 +54,147 @@ void main() {
     final h = await AppHarness.launch(tester);
     await openSettings(h);
     expect(find.text('Version'), findsOneWidget);
-    expect(find.text('0.5.3 (4)'), findsOneWidget);
+    expect(find.text('0.6.3 (5)'), findsOneWidget);
+  });
+
+  testWidgets('tapping the version opens the changelog with two tabs', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSettings(h);
+    await tester.tap(find.text('Version'));
+    await settleRoute(h);
+
+    expect(find.text('Changelog'), findsOneWidget);
+    expect(find.widgetWithText(Tab, 'App'), findsOneWidget);
+    expect(find.widgetWithText(Tab, 'Sensor firmware'), findsOneWidget);
+
+    // App tab: the bundled Changelog.md, app sections and those for both.
+    expect(find.textContaining('0.4.0'), findsWidgets);
+    expect(find.text('Sensor ↔ app protocol (breaking)'), findsOneWidget);
+    // Older releases are further down the (lazily built) list.
+    await tester.dragUntilVisible(
+      find.text('App 1.1.0'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
+    expect(find.text('App 1.1.0'), findsOneWidget);
+    expect(find.textContaining('Firmware 0.3.2'), findsNothing);
+    // Markdown is rendered, not shown raw.
+    expect(find.textContaining('**'), findsNothing);
+    expect(find.textContaining('`'), findsNothing);
+    // The file's introduction closes the list.
+    await tester.drag(find.byType(ListView), const Offset(0, -3000));
+    await tester.pump();
+    expect(find.text('About the version numbers'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(Tab, 'Sensor firmware'));
+    await settleRoute(h);
+    await tester.dragUntilVisible(
+      find.textContaining('Firmware 0.3.2'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
+    expect(find.textContaining('Firmware 0.3.2'), findsOneWidget);
+    expect(find.text('Sensor ↔ app protocol (breaking)'), findsOneWidget);
+    expect(find.text('App 1.1.0'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('put the sensor to sleep: asks first, then waits for wake-up', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSensor(h);
+
+    await tester.tap(find.text('Put sensor to sleep'));
+    await settleRoute(h);
+    expect(find.text('Put sensor to sleep?'), findsOneWidget);
+    expect(find.textContaining('shake or hit it'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await settleRoute(h);
+    expect(h.mock.isAsleep, isFalse);
+
+    await tester.tap(find.text('Put sensor to sleep'));
+    await settleRoute(h);
+    await tester.tap(find.text('Put to sleep'));
+    await settleRoute(h);
+    expect(h.mock.isAsleep, isTrue);
+    expect(
+      find.text('The sensor is going to sleep. Shake or hit it to wake it up.'),
+      findsOneWidget,
+    );
+    // The row stays, disabled, and says how to wake the sensor.
+    expect(find.textContaining('The sensor is asleep.'), findsOneWidget);
+    expect(
+      tester
+          .widget<ListTile>(
+            find.widgetWithText(ListTile, 'Put sensor to sleep'),
+          )
+          .enabled,
+      isFalse,
+    );
+
+    // Settings and the main screen show "asleep", not a lost connection.
+    await tester.pageBack();
+    await settleRoute(h);
+    expect(find.text('Sensor asleep'), findsOneWidget);
+    await tester.pageBack();
+    await settleRoute(h);
+    expect(find.text('Sensor asleep'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(ConnectionIndicator),
+        matching: find.text('Disconnected'),
+      ),
+      findsNothing,
+    );
+
+    // While the reconnect attempts run in the background, too.
+    await h.advance(const Duration(seconds: 30));
+    expect(find.text('Sensor asleep'), findsOneWidget);
+
+    h.mock.wake();
+    await h.advance(const Duration(milliseconds: 100));
+    expect(
+      find.descendant(
+        of: find.byType(ConnectionIndicator),
+        matching: find.text('Connected'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Sensor asleep'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('no sleep action for a sensor that cannot sleep', (tester) async {
+    final h = await AppHarness.launch(tester);
+    h.mock.supportsSleep = false;
+    h.mock.simulateDisconnect();
+    await h.advance(const Duration(milliseconds: 100));
+    h.mock.simulateReconnect();
+    await h.advance(const Duration(milliseconds: 100));
+    await openSensor(h);
+
+    expect(find.text('Battery'), findsOneWidget);
+    expect(find.text('Put sensor to sleep'), findsNothing);
+  });
+
+  testWidgets('sleep action is disabled while the sensor is disconnected', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSensor(h);
+    h.mock.simulateDisconnect();
+    await h.advance(const Duration(milliseconds: 100));
+
+    expect(
+      find.text('Only possible while the sensor is connected.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Put sensor to sleep'));
+    await settleRoute(h);
+    expect(find.text('Put sensor to sleep?'), findsNothing);
   });
 
   testWidgets('back twice exits, a single back only shows a hint', (
@@ -251,7 +396,7 @@ void main() {
     expect(find.text('OpenToF Sensor (simulated)'), findsOneWidget);
     expect(find.text('MOCK-0001'), findsOneWidget);
     expect(find.text('0.1'), findsOneWidget);
-    expect(find.text('0.5.0'), findsOneWidget);
+    expect(find.text('0.6.0'), findsOneWidget);
     expect(find.text('MockJumpDetector'), findsOneWidget);
   });
 
@@ -271,7 +416,7 @@ void main() {
   testWidgets('no warning while app and firmware share MAJOR.MINOR', (
     tester,
   ) async {
-    final h = await AppHarness.launch(tester); // app 0.5.3, firmware 0.5.0
+    final h = await AppHarness.launch(tester); // app 0.6.3, firmware 0.6.0
     await openSettings(h);
     expect(find.text("Sensor firmware doesn't match this app"), findsNothing);
   });
@@ -279,11 +424,11 @@ void main() {
   testWidgets('settings and the sensor page warn on a version mismatch', (
     tester,
   ) async {
-    final h = await AppHarness.launch(tester, appVersion: '0.6.0 (7)');
+    final h = await AppHarness.launch(tester, appVersion: '0.7.0 (7)');
     await openSettings(h);
     expect(find.text("Sensor firmware doesn't match this app"), findsOneWidget);
     expect(
-      find.textContaining('App 0.6.0, sensor firmware 0.5.0'),
+      find.textContaining('App 0.7.0, sensor firmware 0.6.0'),
       findsOneWidget,
     );
     await tester.tap(find.text('OpenToF-Mock'));

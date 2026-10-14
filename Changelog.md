@@ -9,6 +9,28 @@ firmware 0.4.x, and older firmware (≤ 0.3.2) no longer works with the new app 
 
 For the reasoning behind individual choices see `docs/DECISIONS.md`; this file only says what changed.
 
+## 0.6.0 — unreleased (2026-10-14)
+
+**App 0.6.0** (build 5) and **firmware 0.6.0**. Still BLE protocol 1: the new sleep command is optional, so
+app 0.6.0 also works with firmware 0.5.0 (just without the sleep button), but it shows the version warning.
+
+### Sensor firmware
+- **Sleep on command:** the app can now send the sensor to deep sleep right away. It blinks 6 times and
+  sleeps exactly as after the idle timeout; shake or hit it to wake it up.
+- `firmware/README.md` now also explains the red charge LED (charging, full, off).
+
+### App
+- **Changed: when a routine starts.** Press Start while jumping: the jump you are in counts as jump 1, so the
+  first landing after Start is jump 1. The jump that had already landed no longer counts, and pressing Start
+  no longer beeps. The inactivity timeout now runs from the moment you press Start. A 1-jump routine ends on
+  the first landing after Start.
+- **Put sensor to sleep:** a button on the sensor page (Battery section) sends the sensor to sleep, with a
+  confirmation that explains how to wake it. While it sleeps the status reads "Sensor asleep" and the app
+  looks for it less often. The button is hidden for firmware that can't do this.
+- **Changelog in the app:** Settings → Version shows what changed in each release, with separate tabs for the
+  app and the sensor firmware.
+- **LED help page:** now also explains the red charge LED.
+
 ## 0.5.0 — unreleased (2026-10-09)
 
 **App 0.5.0** (build 4) and **firmware 0.5.0**. The BLE protocol is unchanged (still protocol 1), but update

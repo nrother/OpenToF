@@ -28,7 +28,8 @@ Compile check (works from PowerShell, ~1 min, run from inside `firmware/`): the 
 `$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_arduino --build-path <tmp> OpenToF_Firmware`.
 
 Deep sleep (`core/DeepSleep.h`, read its header comment before touching IMU or pin setup): the device sleeps in
-EM4 when idle and wakes up every 3 s to ask the IMU for motion. Anything added to `setup()` must come after the
+EM4 when idle or when the app sends the sleep command (Command characteristic, see `config/BleUuids.h`), and wakes
+up every 3 s to ask the IMU for motion. Both ways to sleep go through `sleepNow()` in the `.ino`. Anything added to `setup()` must come after the
 wake check at its top, and nothing before that check may call `pinMode()` on `IMU_POWER_PIN`. While it sleeps an
 upload fails with "cannot read IDR": retry a few times, or shake the device first. For testing, lower
 `SLEEP_AFTER_IDLE_MS`.

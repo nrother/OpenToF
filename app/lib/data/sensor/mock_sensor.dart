@@ -12,11 +12,13 @@ import 'sensor.dart';
 /// sends final events right away; [startBouncing] sends each event as a
 /// provisional estimate followed by the final one, with confidence, an
 /// occasional reason bit, two intensity fields, and now and then a false
-/// landing that is retracted.
+/// landing that is retracted. It can be sent to deep sleep and woken again
+/// ([sleep], [wake]) like firmware with deep sleep.
 class MockSensor implements Sensor {
   MockSensor({
     this.id = 'mock-1',
     this._name = 'OpenToF-Mock',
+    this.supportsSleep = true,
     DateTime Function()? clock,
     int seed = 1,
   }) : _clock = clock ?? DateTime.now,
@@ -35,7 +37,13 @@ class MockSensor implements Sensor {
   String _name;
   final DateTime Function() _clock;
   final math.Random _random;
-  late final DateTime _epoch;
+  late DateTime _epoch;
+
+  /// Set to false to behave like firmware without deep sleep.
+  @override
+  bool supportsSleep;
+  bool _asleep = false;
+  int _bootCount = 1;
 
   final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
@@ -66,12 +74,14 @@ class MockSensor implements Sensor {
 
   bool get isBouncing => _bounceTimer != null;
 
+  bool get isAsleep => _asleep;
+
   @override
   Future<void> connect() async {
     _wantConnected = true;
     _setState(SensorConnectionState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (!_wantConnected) return;
+    if (!_wantConnected || _asleep) return;
     _setState(SensorConnectionState.connected);
     _battery.add(_batteryLevel);
     _batteryTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
@@ -100,18 +110,29 @@ class MockSensor implements Sensor {
   Future<void> writeName(String name) async => _name = name;
 
   @override
+  Future<void> sleep() async {
+    if (_current != SensorConnectionState.connected) {
+      throw StateError('Sensor not connected');
+    }
+    if (!supportsSleep) throw StateError('Sensor cannot sleep');
+    _asleep = true;
+    stopBouncing();
+    _setState(SensorConnectionState.disconnected);
+  }
+
+  @override
   Future<DeviceInfo> readDeviceInfo() async => const DeviceInfo(
     manufacturerName: 'OpenToF',
     modelNumber: 'OpenToF Sensor (simulated)',
     serialNumber: 'MOCK-0001',
     hardwareRevision: '0.1',
-    firmwareRevision: '0.5.0',
+    firmwareRevision: '0.6.0',
     softwareRevision: 'MockJumpDetector',
   );
 
   @override
   Future<SensorInfo?> readSensorInfo() async =>
-      SensorInfo(protocol: 1, bootCount: 1, deviceTimeMs: _nowMs());
+      SensorInfo(protocol: 1, bootCount: _bootCount, deviceTimeMs: _nowMs());
 
   @override
   Future<AlgorithmMetadata> readAlgorithmMetadata() async =>
@@ -295,9 +316,23 @@ class MockSensor implements Sensor {
   void simulateDisconnect() => _setState(SensorConnectionState.disconnected);
 
   void simulateReconnect() {
-    if (!_wantConnected) return;
+    if (!_wantConnected || _asleep) return;
     _setState(SensorConnectionState.connected);
     _battery.add(_batteryLevel);
+  }
+
+  /// Shakes the sleeping sensor awake. Like the real one it starts over
+  /// (new boot, device clock and jump ids from zero) and the app reconnects.
+  void wake() {
+    if (!_asleep) return;
+    _asleep = false;
+    _bootCount++;
+    _epoch = _clock();
+    _jumpId = 0;
+    _takeoffMs = null;
+    _lastLandingMs = null;
+    _lastEventMs = 0;
+    simulateReconnect();
   }
 
   void setBatteryLevel(int level) {

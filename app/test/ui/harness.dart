@@ -80,7 +80,7 @@ class AppHarness {
     WidgetTester tester, {
     Map<String, Object> prefs = const {},
     bool paired = true,
-    String appVersion = '0.5.3 (4)', // same MAJOR.MINOR as the mock firmware
+    String appVersion = '0.6.3 (5)', // same MAJOR.MINOR as the mock firmware
   }) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;
