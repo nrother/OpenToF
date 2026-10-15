@@ -1,70 +1,62 @@
-# OpenToF Companion App
+# OpenToF companion app
 
-Flutter app (Android 10+ / iOS 15+) that connects to one OpenToF BLE sensor on a trampoline, shows the
-live flight time of the last jump, charts recent jumps and runs a 10-jump routine with CSV export.
-
-This app is part of the [OpenToF](../README.md) monorepo; the sensor firmware lives in [`../firmware/`](../firmware/).
-
-Docs: [`../docs/DECISIONS.md`](../docs/DECISIONS.md) (resolved product decisions, overrides the spec),
-[`../docs/PLAN.md`](../docs/PLAN.md) (architecture, status, open items),
-[`OpenToF-App-Specification-v0.1.md`](OpenToF-App-Specification-v0.1.md) (original spec).
+Flutter app (Android 10+ / iOS 15+) that connects to one OpenToF sensor, shows the flight time of every jump, charts
+recent jumps, runs routines and exports CSV. Part of the [OpenToF](../README.md) monorepo; the protocol it speaks is
+in [`../docs/PROTOCOL.md`](../docs/PROTOCOL.md), the product rules in [`../docs/DECISIONS.md`](../docs/DECISIONS.md)
+and the code layout in [`../docs/ROADMAP.md`](../docs/ROADMAP.md).
 
 ## Develop
 
-Requires the Flutter SDK on your `PATH`.
+Requires the Flutter SDK. Run everything from this folder.
 
 ```sh
 flutter pub get
-flutter gen-l10n                     # after editing lib/l10n/*.arb
 flutter analyze
 flutter test
-dart run tool/generate_sounds.dart   # regenerate assets/sounds/*.wav
+dart format lib test
 ```
 
-## Try the UI in the browser
+After editing:
 
-Start the web server:
+| You changed | Run |
+|---|---|
+| `lib/l10n/app_en.arb` / `app_de.arb` | `flutter gen-l10n` (the generated `app_localizations*.dart` are committed) |
+| `../Changelog.md` | `dart run tool/sync_changelog.dart` (updates the bundled copy; `flutter test` fails until you do) |
+| the tones in `tool/generate_sounds.dart` | `dart run tool/generate_sounds.dart` |
+| the logo in `../img/` | `tool/generate_branding.ps1` (Windows PowerShell), then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create` |
+
+## Code rules
+
+- `lib/domain/` is pure Dart: no Flutter or BLE imports, time is passed in (`clockProvider`), and it has unit tests.
+- All BLE UUIDs and byte parsing live in `lib/data/ble/ble_protocol.dart`. Keep it in sync with
+  `../firmware/OpenToF_Firmware/config/BleUuids.h` and [`../docs/PROTOCOL.md`](../docs/PROTOCOL.md).
+- The UI only talks to the `Sensor` interface; `MockSensor` (debug builds) and `BleSensor` implement it.
+- Every user-visible string goes through l10n (English and German), never hardcoded.
+- The LED help page (`lib/ui/settings/led_help_screen.dart`) repeats the firmware's LED timings: change both together.
+
+## Tests
+
+`test/ui/harness.dart` starts the app with a `MockSensor`, a fake clock, fake audio and a fake export service.
+
+- Don't use `pumpAndSettle`: periodic timers never settle. Use `harness.advance(...)`; for route transitions `pump()`
+  and then advance ~600 ms.
+- Long lists are built lazily: scroll (`dragUntilVisible`) before looking for items further down.
+- A `TextEditingController` belongs to a `State` and is disposed there, not right after `showDialog` returns.
+
+## Run without hardware
+
+Debug builds include a simulated sensor: open **Settings → Developer (debug build) → Use simulated sensor**, pair
+"OpenToF-Mock", then use *Start bouncing* / *Single jump* / *Drop next jump* / *Simulate disconnect*.
+
+To try the UI in a browser (no real Bluetooth; export and sound are limited):
 
 ```sh
 flutter run -d web-server --web-port 8765
 ```
 
-Then open <http://localhost:8765> in Chrome or Edge (the server only finishes starting once a browser
-connects). Press `r` in the terminal to hot reload, `q` to quit. Pick any free port if 8765 is taken.
-
-Real Bluetooth is not available in the browser, so use the simulated sensor (next section). CSV export and
-sound playback are limited in the browser.
-
-## Run without hardware
-
-Debug builds include a simulated sensor: open **Settings → Developer (debug build) → Use simulated
-sensor**, pair "OpenToF-Mock", then use *Start bouncing* / *Single jump* / *Drop next landing* /
-*Simulate disconnect* to exercise the app.
-
-## Firmware
-
-See [`../firmware/CLAUDE.md`](../firmware/CLAUDE.md) for the firmware's own structure. Quick summary:
-
-`../firmware/OpenToF_Firmware/OpenToF_Firmware.ino` is the sensor firmware for the Seeed XIAO MG24 Sense.
-
-Arduino IDE setup:
-1. *File → Preferences → Additional boards manager URLs*: add
-   `https://siliconlabs.github.io/arduino/package_arduinosilabs_index.json`.
-2. *Boards Manager*: install **Silicon Labs**. Select board **XIAO MG24 Sense**.
-3. *Tools → Protocol stack*: **BLE (Arduino)** (not "BLE (Silabs)").
-4. *Library Manager*: install **ArduinoBLE** and **Seeed Arduino LSM6DS3** (version 2.0.4 or newer).
-5. Open the `.ino`, *Verify*, then *Upload*.
-
-One sketch, `../firmware/OpenToF_Firmware/`:
-- It reads the real IMU and has a plug-in interface for your own detection algorithm: write your logic in
-  `MyJumpDetector::onSample()` (search for "YOUR ALGORITHM"). It gets accel (g) and gyro (deg/s) for every
-  sample and reports `takeoff()` / `landing()`. Set `IMU_SERIAL_LOG 1` to stream the raw data to the Serial
-  Monitor while tuning.
-- Set `DEMO_MODE 1` (`config/FirmwareConfig.h`) to send simulated jumps instead of reading the IMU: use this to
-  test the app and the BLE link without hardware or a tuned algorithm.
+Then open <http://localhost:8765> in Chrome or Edge (the server only finishes starting once a browser connects).
 
 ## Run on a device
 
-Needs the Android SDK (Android Studio) for Android, or a Mac with Xcode for iOS:
-`flutter run` (real BLE) — the BLE UUIDs in `lib/data/ble/ble_protocol.dart` are **placeholders** until
-they are agreed with the firmware.
+Android needs the Android SDK (Android Studio), iOS a Mac with Xcode. `flutter run` uses real Bluetooth; flash the
+firmware with `DEMO_MODE 1` (see [`../firmware/README.md`](../firmware/README.md)) to get jumps without a trampoline.

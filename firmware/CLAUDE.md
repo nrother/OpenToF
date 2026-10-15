@@ -1,39 +1,17 @@
-# OpenToF Firmware
+# OpenToF firmware — agent notes
 
-Arduino sketch for the OpenToF sensor. Part of the OpenToF monorepo (see the repo root `CLAUDE.md` for the
-overall layout and repo-wide working rules). The companion app lives in `../app/`.
+Read `README.md` in this folder first (setup, layout, configuration, algorithms, deep sleep, LED signals). Protocol
+and algorithm API: `../docs/PROTOCOL.md`; decisions: `../docs/DECISIONS.md`.
 
-**Git: never `git push`; ask the user before every commit or branch change; ask major/minor/hotfix and bump
-`FIRMWARE_VERSION` in `OpenToF_Firmware/config/FirmwareConfig.h` on a commit that changes `OpenToF_Firmware/`
-(not the helper sketches below); major/minor also bumps the app to the same MAJOR.MINOR. Full policy in the repo
-root `CLAUDE.md`.**
+## Environment (this machine)
+- The user installs and runs the Arduino tooling and flashes the board. `arduino-cli` is not on PATH; use the IDE's
+  bundled one. Compile check (~1 min, from inside `firmware/`, works from PowerShell and Bash):
+  `"$LOCALAPPDATA/Programs/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe" compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_arduino --build-path <tmp> OpenToF_Firmware`
+- Compile-check `DEMO_MODE` 0 and 1 when touching code that both use.
 
-`OpenToF_Firmware/` (Arduino, XIAO MG24 Sense; user writes `MyJumpDetector.h`). Simulated jumps for testing
-the app without real detection are `DEMO_MODE 1` in `config/FirmwareConfig.h`, not a separate sketch (a former
-`OpenToF_Firmware_Dummy/` sketch was folded into this one and removed, 2026-09-22). Keep BLE UUIDs/payloads in
-sync with `../app/lib/data/ble/ble_protocol.dart`. The user installs the Arduino tooling themselves.
-
-The main sketch is multi-file: `.ino` has only `setup()/loop()`, everything else is a header in `config/`
-(settings in `FirmwareConfig.h`, all UUIDs in `BleUuids.h`), `algorithms/` (one header per jump-detection
-algorithm, e.g. `MyJumpDetector.h`, `BatteryCurve.h`; which algorithm builds is picked by commenting
-`#include`+`typedef` pairs in/out at the top of the `.ino`, see its header comment) or `core/` (plumbing);
-list in the `.ino` comment. Headers include each other relative to their own folder (`../core/X.h`); the
-sketch root is not on the include path.
-
-Arduino IDE pitfall: it auto-generates prototypes for free functions in `.ino` files above the sketch's own
-types, so keep code in headers (not affected) and keep free functions in the `.ino` free of sketch-defined
-types in their signatures.
-
-Compile check (works from PowerShell, ~1 min, run from inside `firmware/`): the Arduino IDE's bundled CLI at
-`$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_arduino --build-path <tmp> OpenToF_Firmware`.
-
-Deep sleep (`core/DeepSleep.h`, read its header comment before touching IMU or pin setup): the device sleeps in
-EM4 when idle or when the app sends the sleep command (Command characteristic, see `config/BleUuids.h`), and wakes
-up every 3 s to ask the IMU for motion. Both ways to sleep go through `sleepNow()` in the `.ino`. Anything added to `setup()` must come after the
-wake check at its top, and nothing before that check may call `pinMode()` on `IMU_POWER_PIN`. While it sleeps an
-upload fails with "cannot read IDR": retry a few times, or shake the device first. For testing, lower
-`SLEEP_AFTER_IDLE_MS`.
-
-## Other files in this folder
-`datalogger_selfmade/`, `ble_test/` and `deep_sleep_test/` are standalone preliminary/reference sketches, not part of
-`OpenToF_Firmware/`. Hardware datasheets (battery, IMU, board schematic) live in `../docs/hardware/`, not here.
+## Working
+- Only `OpenToF_Firmware/` is versioned and released; the helper sketches are standalone.
+- A protocol change touches `config/BleUuids.h`, `../app/lib/data/ble/ble_protocol.dart` and `../docs/PROTOCOL.md`
+  together.
+- LED timings and the sleep time also appear in the app's LED help texts (`../app/lib/l10n/`); change both.
+- Before touching `setup()`, pins or the IMU, read the header comment of `core/DeepSleep.h`.

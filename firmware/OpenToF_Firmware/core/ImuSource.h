@@ -26,7 +26,7 @@ class ImuSource : public TransitionSource {
     Wire.begin();
 
     // Fast I2C, set here (before _imu.begin(), which does its own I2C traffic) to match
-    // firmware/datalogger/datalogger.ino, a minimal known-working reference sketch for this
+    // firmware/datalogger_selfmade/, a minimal known-working reference sketch for this
     // exact board. NOTE: this ordering was once suspected to be the fix for a "no IMU data"
     // bug; it wasn't (see readRegPair() below for the actual cause) -- kept because it's
     // harmless and matches the reference, not because it's known to matter.
