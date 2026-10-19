@@ -13,13 +13,6 @@
 // 0 = 416 Hz / +-8 g, 1 = 833 Hz / +-16 g.
 #define IMU_USE_HIGH_RATE_PROFILE 0
 
-// 1 = print every IMU sample as CSV over Serial (for looking at real data and tuning).
-// Columns: t_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps   Text messages start with "# ".
-// Print only every Nth sample; 1 = every sample needs a much higher SERIAL_BAUD
-// (833 Hz * ~45 bytes = ~37 kB/s -> use 921600 and set the same in the Serial Monitor).
-#define IMU_SERIAL_LOG 0
-#define IMU_SERIAL_LOG_EVERY_N 8
-
 #define DEBUG_SERIAL 1
 #define SERIAL_BAUD 115200
 
@@ -106,13 +99,6 @@
 // All LED signals are listed in firmware/README.md ("LED status").
 #define LED_WAITING_ON_MS 300
 #define LED_WAITING_OFF_MS 700
-
-#ifndef LED_BUILTIN_ACTIVE
-#define LED_BUILTIN_ACTIVE LOW
-#endif
-#ifndef LED_BUILTIN_INACTIVE
-#define LED_BUILTIN_INACTIVE (!LED_BUILTIN_ACTIVE)
-#endif
 
 // ============================================================================
 // Demo simulation (DEMO_MODE 1): bursts of jumps separated by rests.

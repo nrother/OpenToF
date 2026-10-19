@@ -6,48 +6,12 @@
  *   Boards manager URL : https://siliconlabs.github.io/arduino/package_arduinosilabs_index.json
  *   Board package      : "Silicon Labs" -> board "XIAO MG24 Sense"
  *   Tools > Protocol stack : "BLE (Arduino)"        (NOT "BLE (Silabs)")
- *   Libraries          : ArduinoBLE, "Seeed Arduino LSM6DS3" (>= 2.0.4); EEPROM ships with the core
- *
- * This file only wires the parts together. Each part is a header in one of three folders:
- *
- *   config/       settings you change
- *     FirmwareConfig.h      modes, version/identity strings, timing, pins
- *     BleUuids.h            BLE UUIDs (custom + Bluetooth SIG) and the protocol description
- *
- *   algorithms/   logic you write or tune (pick which one runs in the block below)
- *     MyJumpDetector.h        template/illustration, not a tuned detector
- *     StaLtaJumpDetector.h    STA/LTA envelope detector
- *     AzPipelineJumpDetector.h az-only pipeline port
- *     BatteryCurve.h          battery voltage -> percent
- *
- *   core/         plumbing (normally not edited)
- *     JumpDetector.h        interface between the IMU and your algorithm
- *     ImuTypes.h, Transition.h   data types
- *     ImuSource.h           reads the IMU and feeds the detector
- *     DemoSource.h          simulated jumps (DEMO_MODE 1)
- *     JumpEventPublisher.h  takeoff/landing reports -> BLE events (jump ids, stage rules)
- *     BleService.h          BLE GATT server (jump, battery and device information services)
- *     BatteryMonitor.h      battery measurement
- *     DeviceName.h          device name in flash + validation
- *     BootCounter.h         boot counter in flash (lets the app notice a restarted clock)
- *     DeepSleep.h           deep sleep (when idle or on command), wake-up on motion
- *     Logging.h, Micros64.h helpers
- *
- * Includes are relative to the including file: this .ino uses "core/Logging.h", headers use
- * "Sibling.h" or "../core/Logging.h" (the sketch folder itself is not on the include path).
- *
- * Only setup() and loop() are in this .ino on purpose: the Arduino IDE auto-generates
- * prototypes for functions in .ino files, and that breaks when their signatures use types
- * defined in the sketch. Code in the headers is not affected.
+ *   Libraries          : ArduinoBLE, "Seeed Arduino LSM6DS3" (>= 2.0.4)
  */
 
 // ============================================================================
-// Algorithm selection -- uncomment exactly one block (its #include AND its typedef
-// line) to choose the jump-detection algorithm that gets built.
-//
-// To add your own: write a header with a class derived from JumpDetector (copy
-// algorithms/MyJumpDetector.h and rename the class), drop it into algorithms/, and add a
-// block for it here.
+// Algorithm selection -- uncomment exactly one block to choose the
+// jump-detection algorithm that gets built.
 // ============================================================================
 
 // #include "algorithms/MyJumpDetector.h"
@@ -69,7 +33,6 @@ typedef BedCycleJumpDetector ActiveJumpDetector;
 #include "config/FirmwareConfig.h"
 #include "core/BatteryMonitor.h"
 #include "core/BleService.h"
-#include "core/BootCounter.h"
 #include "core/DeepSleep.h"
 #include "core/DemoSource.h"
 #include "core/DeviceName.h"
@@ -79,7 +42,9 @@ typedef BedCycleJumpDetector ActiveJumpDetector;
 
 static ActiveJumpDetector detector;
 static ImuSource imuSource(detector);
+#if DEMO_MODE
 static DemoSource demoSource;
+#endif
 static TransitionSource* source = nullptr;
 static JumpEventPublisher publisher;
 static BatteryMonitor battery;
@@ -104,8 +69,8 @@ static void blinkLed(int times, int ms) {
   }
 }
 
-// Status LED while running: steady on while an app is connected, slow blinking while waiting
-// for one. Call every loop(). The other LED signals are listed in firmware/README.md.
+// Update the LED: steady on while an app is connected, slow blinking while waiting
+// for connection. Must be called once per loop()
 static void updateStatusLed() {
   static bool wasOn = false;
   const bool on = bleConnected() ||
@@ -117,34 +82,31 @@ static void updateStatusLed() {
 
 #if DEEP_SLEEP_ACTIVE
 // Goes to deep sleep now; a connected app is disconnected first. Returns only if the IMU could
-// not be set up as the wake-up source: the device then keeps running (the next blePoll()
-// advertises again if an app was connected).
+// not be set up as the wake-up source.
 static void sleepNow() {
   bleDisconnect();
-  flushDeviceName();
   if (!imuSource.armWakeOnMotion()) {
     // Without a working wake-up source the device would sleep forever: stay awake instead.
-    LOG("IMU wake-up setup failed, staying awake");
-    if (!imuSource.begin()) fatalBlink("IMU init failed");
+    if (!imuSource.begin()) fatalBlink("IMU wake-up setup failed");
     return;
   }
   bleEnd();
   blinkLed(6, 150);  // going to sleep now
 
-  // Every pad keeps its current state during the sleep (see DeepSleep.h), so switch off
-  // everything that draws current. IMU_POWER_PIN stays high and the IMU's I2C pins stay as
-  // they are (idle, pulled up): the IMU keeps running and must not see a disturbed bus.
+  // Every pad keeps its current state during the sleep (see DeepSleep.h). The IMU will be
+  // powered, but everything else should be off.
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
-  digitalWrite(RF_SWITCH_POWER_PIN, LOW);
   digitalWrite(BATTERY_ENABLE_PIN, LOW);
+  digitalWrite(RF_SWITCH_POWER_PIN, LOW);
 #if DEBUG_SERIAL
   Serial.flush();
 #endif
+
   deepSleepEnter();
 }
 
-// Goes to deep sleep when the app asks for it, or after SLEEP_AFTER_IDLE_MS without a BLE
-// connection and without a takeoff/landing (`activity`). Call every loop().
+// Go to deep sleep when the app asks for it, or after SLEEP_AFTER_IDLE_MS without a BLE
+// connection and without a takeoff/landing (`activity = true`). Must be called once per loop().
 static void sleepWhenIdleOrAsked(bool activity) {
   static uint32_t lastActiveMs = 0;
   if (activity || bleConnected()) lastActiveMs = millis();
@@ -157,38 +119,36 @@ static void sleepWhenIdleOrAsked(bool activity) {
     return;
   }
   sleepNow();
-  lastActiveMs = millis();  // still awake (no wake-up source): try again after a full idle time
+  lastActiveMs = millis();  // still awake (sleep failed): try again after a full idle time
 }
 #endif
 
 void setup() {
 #if DEEP_SLEEP_ACTIVE
   // Woken by the sleep timer: only ask the IMU for motion and sleep again if there was none.
-  // This runs every few seconds while asleep, so it comes first: before anything configures a
-  // pin (the IMU must stay powered), writes flash (boot counter) or takes time (BLE, Serial).
-  const bool timerWake = deepSleepTimerWake();
-  if (timerWake && !imuSource.motionSinceSleep()) deepSleepEnter();
+  // This should be as fast as possible to save power
+  const bool wokenFromDeepSleep = deepSleepWokenFromDeepSleep();
+  if (wokenFromDeepSleep && !imuSource.motionSinceSleep()) deepSleepEnter();
 #endif
 
 #if DEBUG_SERIAL
-  Serial.begin(SERIAL_BAUD);  // do not wait for a host: the device runs standalone
+  Serial.begin(SERIAL_BAUD);
 #endif
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
   LOG(String("OpenToF firmware ") + FIRMWARE_VERSION + " (hardware " + HARDWARE_REVISION + ")");
 #if DEEP_SLEEP_ACTIVE
-  if (timerWake) {
+  if (wokenFromDeepSleep) {
     LOG("Woke up from deep sleep: motion detected");
     blinkLed(3, 80);  // show that the shake was noticed
   }
 #endif
 
-  // Antenna switch: power it, select the onboard antenna.
-  pinMode(RF_SWITCH_POWER_PIN, OUTPUT);
-  digitalWrite(RF_SWITCH_POWER_PIN, HIGH);
-  delay(100);
+  // Antenna switch: select the onboard antenna, activate switch
   pinMode(RF_SWITCH_PIN, OUTPUT);
   digitalWrite(RF_SWITCH_PIN, LOW);
+  pinMode(RF_SWITCH_POWER_PIN, OUTPUT);
+  digitalWrite(RF_SWITCH_POWER_PIN, HIGH);
 
 #if DEMO_MODE
   source = &demoSource;
@@ -200,6 +160,7 @@ void setup() {
   loadDeviceName();
   incrementBootCount();
   LOG(String("Boot #") + bootCount);
+
   if (!bleBegin(*source)) fatalBlink("BLE init failed");
 
   if (battery.update(true)) bleSetBatteryLevel(battery.percent());
@@ -227,7 +188,6 @@ void loop() {
 
   if (battery.update(false)) bleSetBatteryLevel(battery.percent());
 
-  flushDeviceName();
   updateStatusLed();
 
 #if DEEP_SLEEP_ACTIVE

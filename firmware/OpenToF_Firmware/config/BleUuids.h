@@ -44,9 +44,6 @@
 #define UUID_CONFIDENCE_KIND "6f70656e-546f-4600-0009-000000000000"
 #define UUID_COMMAND "6f70656e-546f-4600-000a-000000000000"
 
-// Values of the Command characteristic.
-#define COMMAND_SLEEP 0x01
-
 // Human-readable descriptions of the custom characteristics. They are sent as GATT
 // "Characteristic User Description" descriptors (0x2901), which scanner apps such as
 // nRF Connect show under the characteristic. Keep them short (they are read over BLE).
@@ -59,7 +56,6 @@
 #define DESC_REASONS "Reason bit names (JSON)"
 #define DESC_CONFIDENCE_KIND "Confidence kind"
 #define DESC_NAME "Device name (UTF-8, writable)"
-#define DESC_COMMAND "Command (1 = sleep)"
 
 // ============================================================================
 // Bluetooth SIG assigned 16-bit UUIDs (Assigned Numbers, bluetooth.com)
@@ -99,9 +95,3 @@
 #define SIG_CHR_BATTERY_TIME_STATUS "2BEE"  // time until discharged / recharged (minutes)
 #define SIG_CHR_ESTIMATED_SERVICE_DATE "2BEF"
 #define SIG_CHR_BATTERY_ENERGY_STATUS "2BF0"
-
-// Other services that might fit later
-#define SIG_SVC_ENVIRONMENTAL_SENSING "181A"  // with Temperature 0x2A6E (sint16, 0.01 degC)
-#define SIG_CHR_TEMPERATURE "2A6E"
-#define SIG_SVC_DEVICE_TIME "1847"  // Device Time 0x2B90, Current Elapsed Time 0x2BF2
-#define SIG_CHR_DEVICE_TIME "2B90"

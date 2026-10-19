@@ -45,7 +45,7 @@ static void __attribute__((constructor)) deepSleepRestorePins() {
 
 // True if this start is a wake-up by the sleep timer. A reset button press or a power cycle
 // while asleep is a normal start, so the device can always be woken by hand.
-static bool deepSleepTimerWake() {
+static bool deepSleepWokenFromDeepSleep() {
   const uint32_t cause = get_system_reset_cause();
   return (cause & EMU_RSTCAUSE_EM4) && !(cause & (EMU_RSTCAUSE_PIN | EMU_RSTCAUSE_POR));
 }

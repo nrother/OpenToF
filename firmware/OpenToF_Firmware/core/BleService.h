@@ -6,7 +6,6 @@
 
 #include "../config/BleUuids.h"
 #include "../config/FirmwareConfig.h"
-#include "BootCounter.h"
 #include "DeviceName.h"
 #include "Logging.h"
 #include "Micros64.h"
@@ -43,9 +42,6 @@ static BLEDescriptor fieldsDescription(SIG_DESC_USER_DESCRIPTION, DESC_FIELDS);
 static BLEDescriptor reasonsDescription(SIG_DESC_USER_DESCRIPTION, DESC_REASONS);
 static BLEDescriptor confidenceKindDescription(SIG_DESC_USER_DESCRIPTION, DESC_CONFIDENCE_KIND);
 static BLEDescriptor nameDescription(SIG_DESC_USER_DESCRIPTION, DESC_NAME);
-#if DEEP_SLEEP_ACTIVE
-static BLEDescriptor commandDescription(SIG_DESC_USER_DESCRIPTION, DESC_COMMAND);
-#endif
 
 // ---- Battery service ----
 static BLEService batteryService(SIG_SVC_BATTERY);
@@ -139,7 +135,7 @@ static void onNameWritten(BLEDevice central, BLECharacteristic characteristic) {
   bool ok = len >= 1 && len <= NAME_MAX_BYTES;
   if (ok) {
     characteristic.readValue(buf, len);
-    ok = trySetDeviceName(buf, (size_t)len);
+    ok = setDeviceName(buf, (size_t)len);
   }
   if (ok) {
     BLE.setLocalName(deviceName);
@@ -151,37 +147,6 @@ static void onNameWritten(BLEDevice central, BLECharacteristic characteristic) {
     LOG("Rejected invalid device name");
   }
 }
-
-#if DEEP_SLEEP_ACTIVE
-// Set when the app asks for deep sleep; loop() does the work (see bleTakeSleepRequest()).
-// Lives in RAM only, so it is gone after the reset that ends a sleep.
-static bool bleSleepRequested = false;
-
-// A command counts once, when it is written: the stored value is cleared again right away and
-// never looked at outside of this handler.
-static void onCommandWritten(BLEDevice central, BLECharacteristic characteristic) {
-  (void)central;
-  uint8_t command = 0;
-  const int len = characteristic.valueLength();
-  if (len == COMMAND_BYTES) characteristic.readValue(&command, COMMAND_BYTES);
-  const uint8_t none = 0;
-  commandChar.writeValue(&none, COMMAND_BYTES);
-  if (len == COMMAND_BYTES && command == COMMAND_SLEEP) {
-    LOG("Command: sleep");
-    bleSleepRequested = true;
-  } else {
-    LOG(String("Ignored unknown command 0x") + String(command, HEX) + " (" + len + " bytes)");
-  }
-}
-
-// True once after the app sent the sleep command: asking clears the request, so a sleep attempt
-// that fails is not repeated.
-static bool bleTakeSleepRequest() {
-  const bool requested = bleSleepRequested;
-  bleSleepRequested = false;
-  return requested;
-}
-#endif
 
 static void onConnected(BLEDevice central) {
   (void)central;
@@ -214,9 +179,6 @@ static bool bleBegin(const TransitionSource& algorithm) {
   reasonsChar.addDescriptor(reasonsDescription);
   confidenceKindChar.addDescriptor(confidenceKindDescription);
   nameChar.addDescriptor(nameDescription);
-#if DEEP_SLEEP_ACTIVE
-  commandChar.addDescriptor(commandDescription);
-#endif
 
   jumpService.addCharacteristic(eventChar);
   jumpService.addCharacteristic(infoChar);
@@ -224,9 +186,7 @@ static bool bleBegin(const TransitionSource& algorithm) {
   jumpService.addCharacteristic(reasonsChar);
   jumpService.addCharacteristic(confidenceKindChar);
   jumpService.addCharacteristic(nameChar);
-#if DEEP_SLEEP_ACTIVE
-  jumpService.addCharacteristic(commandChar);
-#endif
+
   batteryService.addCharacteristic(batteryLevelChar);
   deviceInfoService.addCharacteristic(manufacturerNameChar);
   deviceInfoService.addCharacteristic(modelNumberChar);
@@ -240,9 +200,7 @@ static bool bleBegin(const TransitionSource& algorithm) {
 
   nameChar.writeValue((const uint8_t*)deviceName, strlen(deviceName));
   nameChar.setEventHandler(BLEWritten, onNameWritten);
-#if DEEP_SLEEP_ACTIVE
-  commandChar.setEventHandler(BLEWritten, onCommandWritten);
-#endif
+
   updateInfo();
   infoChar.setEventHandler(BLERead, onInfoRead);
   setMetaString(fieldsChar, "fieldsJson()", algorithm.fieldsJson());
@@ -278,9 +236,6 @@ static void bleDisconnect() {
   const uint32_t startMs = millis();
   while (millis() - startMs < BLE_SLEEP_COMMAND_DELAY_MS) BLE.poll();
   if (BLE.disconnect()) LOG("BLE disconnected by the sensor");
-#if DEEP_SLEEP_ACTIVE
-  bleSleepRequested = false;  // a command repeated while waiting above belongs to this attempt
-#endif
 }
 
 // Stops advertising and shuts the BLE stack down (before deep sleep).
