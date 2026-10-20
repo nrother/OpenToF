@@ -1,8 +1,10 @@
-App Sleep Request weg?
 Andere Jump detectors weg?
 Soll das Logo im Repo bleieben?
 
 Alle MD-Dateien überarbeiten
 
-Boot-Counter weg?
 Document EEPROM layout
+
+Log every Takeoff/Landing to Serial
+
+Remove all that JSON/Extra info stuff

@@ -13,6 +13,17 @@ static const int EE_MAGIC1 = 0x54;
 static char deviceName[NAME_MAX_BYTES + 1] = DEFAULT_DEVICE_NAME; //+1 for zero-terminator
 static bool nameDirty = false;  // needs to be written to flash (done by flushDeviceName())
 
+// add the last for chars of the serial number to the device name
+// this should be called when deviceName is still set to DEFAULT_DEVICE_NAME
+static void augmentDefaultDeviceName() {
+  auto mac = getDeviceUniqueIdStr();
+  size_t len = strlen(deviceName);
+  if (len < NAME_MAX_BYTES - 5) { //there is still space
+    deviceName[len++] = '-';
+    memcpy(&deviceName[len], &mac.c_str()[mac.length() - 4], 4);
+  }
+}
+
 static void loadDeviceName() {
   if (EEPROM.read(0) != EE_MAGIC0 || EEPROM.read(1) != EE_MAGIC1) return;
   const uint8_t len = EEPROM.read(2);

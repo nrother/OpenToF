@@ -48,8 +48,6 @@
 // WAKE_UP_THS: threshold in steps of 2 g / 64 = 31 mg (0x01..0x3F). Lower = more sensitive.
 // WAKE_UP_DUR: 0x00 = a single sample above the threshold wakes; 0x20/0x40/0x60 = it must stay
 //              above for 1/2/3 more samples (less sensitive to short knocks).
-// firmware/deep_sleep_test/ used 0x08 and 0x3F: that needs a hard hit, shaking by hand is
-// often not enough.
 #define IMU_WAKE_UP_THS 0x02
 #define IMU_WAKE_UP_DUR 0x00
 
@@ -64,7 +62,7 @@
 #define MODEL_NUMBER "OpenToF Sensor"
 // Serial Number String = the BLE device address (unique per chip), set at start-up.
 
-#define DEFAULT_DEVICE_NAME "OpenToF"
+#define DEFAULT_DEVICE_NAME "OpenToF" // the last four chars of the serial are automatically added
 #define NAME_MAX_BYTES 20
 
 // GAP Appearance shown by scanners. 0x0540 = Generic Sensor (0x0541 = Motion Sensor).
@@ -88,7 +86,7 @@
 
 #define IMU_POWER_PIN PD5
 #define IMU_I2C_ADDRESS 0x6A
-#define BATTERY_ENABLE_PIN PD3
+#define BATTERY_ENABLE_ADC_PIN PD3
 #define BATTERY_SENSE_PIN PD4
 #define RF_SWITCH_POWER_PIN PB5
 #define RF_SWITCH_PIN PB4  // LOW = onboard antenna (as in the Seeed BLE example)

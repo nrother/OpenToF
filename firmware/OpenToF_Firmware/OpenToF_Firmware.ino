@@ -96,7 +96,7 @@ static void sleepNow() {
   // Every pad keeps its current state during the sleep (see DeepSleep.h). The IMU will be
   // powered, but everything else should be off.
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
-  digitalWrite(BATTERY_ENABLE_PIN, LOW);
+  digitalWrite(BATTERY_ENABLE_ADC_PIN, LOW);
   digitalWrite(RF_SWITCH_POWER_PIN, LOW);
 #if DEBUG_SERIAL
   Serial.flush();
@@ -105,15 +105,13 @@ static void sleepNow() {
   deepSleepEnter();
 }
 
-// Go to deep sleep when the app asks for it, or after SLEEP_AFTER_IDLE_MS without a BLE
-// connection and without a takeoff/landing (`activity = true`). Must be called once per loop().
+// Go to deep sleep after SLEEP_AFTER_IDLE_MS without a BLE connection and without
+// a takeoff/landing (`activity = true`). Must be called once per loop().
 static void sleepWhenIdleOrAsked(bool activity) {
   static uint32_t lastActiveMs = 0;
   if (activity || bleConnected()) lastActiveMs = millis();
 
-  if (bleTakeSleepRequest()) {
-    LOG("Sleep command, going to deep sleep");
-  } else if (millis() - lastActiveMs >= SLEEP_AFTER_IDLE_MS) {
+  if (millis() - lastActiveMs >= SLEEP_AFTER_IDLE_MS) {
     LOG("Idle, going to deep sleep");
   } else {
     return;
@@ -127,7 +125,7 @@ void setup() {
 #if DEEP_SLEEP_ACTIVE
   // Woken by the sleep timer: only ask the IMU for motion and sleep again if there was none.
   // This should be as fast as possible to save power
-  const bool wokenFromDeepSleep = deepSleepWokenFromDeepSleep();
+  const bool wokenFromDeepSleep = wasWokenFromDeepSleep();
   if (wokenFromDeepSleep && !imuSource.motionSinceSleep()) deepSleepEnter();
 #endif
 
@@ -157,9 +155,8 @@ void setup() {
 #endif
   LOG(String("Algorithm: ") + source->name());
 
+  augmentDefaultDeviceName();
   loadDeviceName();
-  incrementBootCount();
-  LOG(String("Boot #") + bootCount);
 
   if (!bleBegin(*source)) fatalBlink("BLE init failed");
 
