@@ -11,7 +11,6 @@
 static const int EE_MAGIC0 = 0x4F;
 static const int EE_MAGIC1 = 0x54;
 static char deviceName[NAME_MAX_BYTES + 1] = DEFAULT_DEVICE_NAME; //+1 for zero-terminator
-static bool nameDirty = false;  // needs to be written to flash (done by flushDeviceName())
 
 // add the last for chars of the serial number to the device name
 // this should be called when deviceName is still set to DEFAULT_DEVICE_NAME

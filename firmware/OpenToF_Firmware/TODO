@@ -8,3 +8,10 @@ Document EEPROM layout
 Log every Takeoff/Landing to Serial
 
 Remove all that JSON/Extra info stuff
+
+Test with scope how much time I2C takes
+
+Confidence entfernen
+
+Nochmal klären ob wir diesen ganzen Kram mit provisional/final und retraction haben wollen.
+Vielleicht einfach einen stabilen Algorithmus, dann brauchen wir das nicht

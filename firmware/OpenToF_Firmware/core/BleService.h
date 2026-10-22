@@ -172,9 +172,9 @@ static bool bleBegin(const TransitionSource& algorithm) {
   nameChar.writeValue((const uint8_t*)deviceName, strlen(deviceName));
   nameChar.setEventHandler(BLEWritten, onNameWritten);
 
-  setMetaString(fieldsChar, "fieldsJson()", algorithm.fieldsJson());
-  setMetaString(reasonsChar, "reasonsJson()", algorithm.reasonsJson());
-  setMetaString(confidenceKindChar, "confidenceKind()", algorithm.confidenceKind());
+  setMetaString(fieldsChar, "fieldsJson", algorithm.fieldsJson());
+  setMetaString(reasonsChar, "reasonsJson", algorithm.reasonsJson());
+  setMetaString(confidenceKindChar, "confidenceKind", algorithm.confidenceKind());
 
   manufacturerNameChar.writeValue(MANUFACTURER_NAME);
   modelNumberChar.writeValue(MODEL_NUMBER);
@@ -196,16 +196,6 @@ static void bleStartAdvertising() {
 // True while an app is connected (as of the last blePoll()).
 static bool bleIsConnected = false;
 static bool bleConnected() { return bleIsConnected; }
-
-// Disconnects the app, if one is connected. The stack is serviced for BLE_SLEEP_COMMAND_DELAY_MS
-// first, so that the response to the app's last write is sent before the link goes down.
-// Advertising is not restarted here: the next blePoll() does that.
-static void bleDisconnect() {
-  if (!BLE.connected()) return;
-  const uint32_t startMs = millis();
-  while (millis() - startMs < BLE_SLEEP_COMMAND_DELAY_MS) BLE.poll();
-  if (BLE.disconnect()) LOG("BLE disconnected by the sensor");
-}
 
 // Stops advertising and shuts the BLE stack down (before deep sleep).
 static void bleEnd() {

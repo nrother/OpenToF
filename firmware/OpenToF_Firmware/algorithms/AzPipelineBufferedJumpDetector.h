@@ -400,7 +400,7 @@ class AzPipelineBufferedJumpDetector : public JumpDetector {
   // interpolation on the s.timeUs clock) before the pipeline, which keeps the given
   // logic valid at any input rate -- and lets this detector use the 16 g range like
   // the others, removing v1's clipping trade-off.
-  const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
+  // const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
 
   void begin() override {
     _pipeline.reset();

@@ -15,13 +15,6 @@ class JumpDetector {
   // String, at most 32 bytes) so you can see which algorithm is running on a device.
   virtual const char* name() const { return "unnamed detector"; }
 
-  // Which IMU settings your algorithm wants. Override to force one, e.g.
-  //   const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
-  // The default follows IMU_USE_HIGH_RATE_PROFILE.
-  virtual const ImuProfile& imuProfile() const {
-    return IMU_USE_HIGH_RATE_PROFILE ? PROFILE_833HZ_16G : PROFILE_416HZ_8G;
-  }
-
   // ---- OPTIONAL description of what your events carry (each string at most 512 bytes) ----
   // Each is published in its own read-only BLE characteristic; the app reads them on connect.
   //

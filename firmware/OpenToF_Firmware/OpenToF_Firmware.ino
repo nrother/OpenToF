@@ -167,7 +167,6 @@ void setup() {
   demoSource.begin();
 #else
   if (!imuSource.begin()) fatalBlink("IMU init failed");
-  LOG(String("IMU profile: ") + imuSource.profile().name);
 #endif
 
   bleStartAdvertising();

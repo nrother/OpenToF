@@ -1,22 +1,18 @@
-// Deep sleep (EM4) with wake-up on motion. Ported from firmware/deep_sleep_test/.
+// Deep sleep (EM4) with wake-up on motion.
 //
 // The board does not connect the IMU's interrupt pins, so the IMU cannot wake the MCU directly.
-// Instead the MCU sleeps in EM4 and a timer (BURTC) wakes it every SLEEP_POLL_INTERVAL_MS. Each
-// wake-up is a reset: setup() asks the IMU whether it saw motion in the meantime (latched
-// wake-up interrupt, see ImuSource::motionSinceSleep()) and, if not, sleeps again right away.
+// Instead the MCU sleeps in EM4 and a timer (BURTC) wakes it every SLEEP_POLL_INTERVAL_MS. After
+// wakeup the MCU is reset, this case is dected in setup(). We ask the IMU whether it saw motion
+// in the meantime (latched wake-up interrupt, see ImuSource::motionSinceSleep()) and, if not, 
+// sleep again right away.
 //
-// Pins. The IMU has to stay powered (IMU_POWER_PIN high) while the MCU sleeps and across the
-// reset that ends the sleep, otherwise it forgets both its wake-up configuration and the
-// latched "motion seen" flag:
-//   - EM4 is entered with pin retention "latch": every pad keeps the state it has at that moment.
-//     So everything except the IMU supply must be switched to its low-power state BEFORE
-//     deepSleepEnter() (done in the .ino).
+// The IMU has to stay powered (IMU_POWER_PIN high) while the MCU sleeps and across the
+// reset that ends the sleep, otherwise it forgets the latched "motion seen" flag.
+//   - EM4 is entered with pin retention "latch": every pad keeps the state during deep sleep,
+//     so the IMU stays powered.
 //   - After the reset the GPIO registers are back at their defaults while the pads are still
-//     latched. deepSleepRestorePins() runs before main(), writes "IMU_POWER_PIN = output high"
+//     latched. deepSleepRestorePins() runs before main(). It restores the the pin configuration
 //     again and only then releases the latch, so the pin never drops.
-//   - pinMode(pin, OUTPUT) of this core drives the pin low until the following digitalWrite().
-//     On IMU_POWER_PIN that power-cycles the IMU. Nothing on the way from reset to the motion
-//     check may call it (that rules out LSM6DS3::begin() and ImuSource::begin() there).
 //
 // Including ArduinoLowPower.h also adds the core's escape hatch: holding DEEP_SLEEP_ESCAPE_PIN
 // (D1) low during a reset keeps the device awake with the LED on, so it can be flashed.
@@ -31,7 +27,7 @@
 #include "em_gpio.h"
 #include "em_rmu.h"
 
-#include "../config/FirmwareConfig.h"  // DEEP_SLEEP_ACTIVE, SLEEP_POLL_INTERVAL_MS
+#include "../config/FirmwareConfig.h"
 
 // Runs just before main(): there is a stack, but sl_system_init() has not run yet, so only
 // emlib works here (no Arduino API, no RTOS).

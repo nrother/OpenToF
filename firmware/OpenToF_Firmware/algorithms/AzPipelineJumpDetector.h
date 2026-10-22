@@ -36,7 +36,7 @@ class AzPipelineJumpDetector : public JumpDetector {
   const char* name() const override { return "AzPipeline v2"; }
 
   // Landings peak near 16 g; the filter adapts to the delivered sample rate.
-  const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
+  // const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
 
   void begin() override {
     for (int i = 0; i < 7; i++) _medianBuf[i] = 0.0f;

@@ -35,7 +35,7 @@ class StaLtaJumpDetector : public JumpDetector {
   const char* name() const override { return "StaLta v2"; }
 
   // Landings peak near 16 g; an 8 g range would clip them.
-  const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
+  // const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
 
   void begin() override {
     _onBed = false;
