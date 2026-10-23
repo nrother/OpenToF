@@ -14,6 +14,8 @@ constexpr uint16_t FIFO_ODR_HZ = 400;
 constexpr bool ascii_mode = false;
 
 // Binary packet:
+//   uint32_t MCU timestamp (micros at FIFO read)
+//   uint32_t sensor timestamp (LSM6DS3, 25 us resolution)
 //   int16_t gyro X
 //   int16_t gyro Y
 //   int16_t gyro Z
@@ -21,7 +23,7 @@ constexpr bool ascii_mode = false;
 //   int16_t accel Y
 //   int16_t accel Z
 //
-// = 12 bytes/sample.
+// = 26 bytes/packet (2 marker + 2 counter + 2 debugData + 8 timestamps + 12 IMU).
 struct __attribute__((packed)) ImuSample
 {
   int16_t gx;
@@ -34,7 +36,8 @@ struct __attribute__((packed)) ImuSample
 
 static_assert(sizeof(ImuSample) == 12, "Unexpected packet size");
 
-void sendSample(const uint16_t debugData, const ImuSample &sample)
+void sendSample(const uint16_t debugData, const uint32_t t_us,
+                const uint32_t t_sensor, const ImuSample &sample)
 {
   static uint16_t packetCounter = 0;
 
@@ -43,12 +46,19 @@ void sendSample(const uint16_t debugData, const ImuSample &sample)
   Serial.write(reinterpret_cast<const uint8_t *>(&packetCounter), sizeof(packetCounter));
   packetCounter++;
   Serial.write(reinterpret_cast<const uint8_t *>(&debugData), sizeof(debugData));
+  Serial.write(reinterpret_cast<const uint8_t *>(&t_us), sizeof(t_us));
+  Serial.write(reinterpret_cast<const uint8_t *>(&t_sensor), sizeof(t_sensor));
   Serial.write(reinterpret_cast<const uint8_t *>(&sample),
                sizeof(sample));
 }
 
-void sendSampleAscii(const ImuSample &sample)
+void sendSampleAscii(const uint32_t t_us, const uint32_t t_sensor,
+                     const ImuSample &sample)
 {
+  Serial.print(t_us);
+  Serial.write(",");
+  Serial.print(t_sensor);
+  Serial.write(",");
   Serial.print(myIMU.calcAccel(sample.ax), 3);
   Serial.write(",");
   Serial.print(myIMU.calcAccel(sample.ay), 3);
@@ -100,6 +110,11 @@ void setup()
 
   // myIMU.settings.timestampFifoEnabled = 1;
 
+  // Sensor timestamp counter, read from TIMESTAMP0..2 for every sample.
+  // 25 us resolution; 6.4 ms would be too coarse at 416 Hz.
+  myIMU.settings.timestampEnabled = 1;
+  myIMU.settings.timestampResolution = 1;
+
   // FIFO configuration.
   myIMU.settings.fifoSampleRate = FIFO_ODR_HZ;
   myIMU.settings.fifoModeWord = 6; // continuous
@@ -116,7 +131,7 @@ void setup()
 
   if (ascii_mode) {
     // write a header so this can be used as CSV file
-    Serial.write("ax,ay,az,gx,gy,gz\n");
+    Serial.write("t_us,t_sensor,ax,ay,az,gx,gy,gz\n");
   }
 
   myIMU.fifoBegin();
@@ -156,12 +171,22 @@ void loop()
     // One complete gyro + accel sample
     ImuSample sample;
 
+    // Both stamps are read when the sample is dequeued. If debugData stays
+    // well above 6, the FIFO is backed up and these are later than the sample.
+    const uint32_t t_us = micros();
     myIMU.readRegisterRegion(reinterpret_cast<uint8_t *>(&sample), LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(sample));
 
+    uint8_t ts[3] = {0};
+    myIMU.readRegisterRegion(ts, LSM6DS3_ACC_GYRO_TIMESTAMP0_REG, sizeof(ts));
+    const uint32_t t_sensor =
+        (uint32_t)ts[0] |
+        ((uint32_t)ts[1] << 8) |
+        ((uint32_t)ts[2] << 16);
+
     if (!ascii_mode) {
-        sendSample(words, sample);
+        sendSample(words, t_us, t_sensor, sample);
     } else {
-        sendSampleAscii(sample);
+        sendSampleAscii(t_us, t_sensor, sample);
     }
 
     words -= 6;
