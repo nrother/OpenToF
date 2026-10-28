@@ -1,17 +1,21 @@
 #include <Wire.h>
 #include <LSM6DS3.h>
+#include <string.h>
 
 // XIAO MG24 Sense:
 // LSM6DS3TR-C I2C address is 0x6A.
 LSM6DS3 myIMU(I2C_MODE, 0x6A);
 
 // Maximum gyro rate is 1.66kHz, Accel would go up to 6.66kHz
-constexpr uint16_t SENSOR_ODR_HZ = 416;//208;//833;
+constexpr uint16_t SENSOR_ODR_HZ = 208;//416;//208;//833;
 // FIFO rate should be the same, don't know why this is listed as 1600
-constexpr uint16_t FIFO_ODR_HZ = 400;
+constexpr uint16_t FIFO_ODR_HZ = 200;//400;
 
 // if true, print in ASCII
 constexpr bool ascii_mode = false;
+
+// Gyro (3 words), accel (3 words), timestamp (3 words).
+constexpr uint16_t FIFO_WORDS_PER_SAMPLE = 9;
 
 // Binary packet:
 //   int16_t gyro X
@@ -20,8 +24,9 @@ constexpr bool ascii_mode = false;
 //   int16_t accel X
 //   int16_t accel Y
 //   int16_t accel Z
+//   uint32_t raw timestamp (24 significant bits, 25 us/tick)
 //
-// = 12 bytes/sample.
+// = 16 bytes/sample, 22 bytes including marker/counter/debugData.
 struct __attribute__((packed)) ImuSample
 {
   int16_t gx;
@@ -30,9 +35,10 @@ struct __attribute__((packed)) ImuSample
   int16_t ax;
   int16_t ay;
   int16_t az;
+  uint32_t timestamp;
 };
 
-static_assert(sizeof(ImuSample) == 12, "Unexpected packet size");
+static_assert(sizeof(ImuSample) == 16, "Unexpected packet size");
 
 void sendSample(const uint16_t debugData, const ImuSample &sample)
 {
@@ -60,6 +66,8 @@ void sendSampleAscii(const ImuSample &sample)
   Serial.print(myIMU.calcGyro(sample.gy), 3);
   Serial.write(",");
   Serial.print(myIMU.calcGyro(sample.gz), 3);
+  Serial.write(",");
+  Serial.print(sample.timestamp);
   Serial.write("\n");
 }
 
@@ -70,7 +78,7 @@ void setup()
 
   // we need a pretty high baud rate
   Serial.begin(921600);
-  
+
   while (!Serial);
 
   // turn on IMU power
@@ -98,7 +106,9 @@ void setup()
   myIMU.settings.accelFifoEnabled = 1;
   myIMU.settings.accelFifoDecimation = 1;
 
-  // myIMU.settings.timestampFifoEnabled = 1;
+  myIMU.settings.timestampEnabled = 1;
+  myIMU.settings.timestampFifoEnabled = 1;
+  myIMU.settings.timestampResolution = 1; // Maximum resolution: 25 us/tick
 
   // FIFO configuration.
   myIMU.settings.fifoSampleRate = FIFO_ODR_HZ;
@@ -116,13 +126,13 @@ void setup()
 
   if (ascii_mode) {
     // write a header so this can be used as CSV file
-    Serial.write("ax,ay,az,gx,gy,gz\n");
+    Serial.write("ax,ay,az,gx,gy,gz,timestamp\n");
   }
 
   myIMU.fifoBegin();
 
   // workarround
-  myIMU.writeRegister(LSM6DS3_ACC_GYRO_FIFO_CTRL4, 0); // disable dataset 3 and 4
+  myIMU.writeRegister(LSM6DS3_ACC_GYRO_FIFO_CTRL4, 0x08); // disabled dataset 3, enable only 4
 
   // wait a bit for everything to settle
   delay(10);
@@ -148,15 +158,21 @@ void loop()
   }
 
   int16_t status = myIMU.fifoGetStatus();
-  uint16_t words = status & 0x0FFF;
+  uint16_t words = status & 0x07FF;
 
-  while (words >= 6)
+  while (words >= FIFO_WORDS_PER_SAMPLE)
   {
 
-    // One complete gyro + accel sample
+    // Read one complete gyro + accel + timestamp FIFO sample in a single burst.
     ImuSample sample;
+    uint8_t raw[FIFO_WORDS_PER_SAMPLE * 2];
+    myIMU.readRegisterRegion(raw, LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(raw));
 
-    myIMU.readRegisterRegion(reinterpret_cast<uint8_t *>(&sample), LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(sample));
+    memcpy(&sample, raw, 12); // copy accel + gyro
+    // Dataset 4: timestamp[15:8], timestamp[23:16], unused, timestamp[7:0], steps[7:0], steps[15:8]
+    sample.timestamp = static_cast<uint32_t>(raw[15])
+                     | (static_cast<uint32_t>(raw[12]) << 8)
+                     | (static_cast<uint32_t>(raw[13]) << 16);
 
     if (!ascii_mode) {
         sendSample(words, sample);
@@ -164,6 +180,6 @@ void loop()
         sendSampleAscii(sample);
     }
 
-    words -= 6;
+    words -= FIFO_WORDS_PER_SAMPLE;
   }
 }
