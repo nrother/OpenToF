@@ -10,6 +10,9 @@ constexpr uint16_t SENSOR_ODR_HZ = 416;//208;//833;
 // FIFO rate should be the same, don't know why this is listed as 1600
 constexpr uint16_t FIFO_ODR_HZ = 400;
 
+// external LED to also flash for sync
+constexpr auto external_led = PA5;
+
 // if true, print in ASCII
 constexpr bool ascii_mode = false;
 
@@ -66,7 +69,9 @@ void sendSampleAscii(const ImuSample &sample)
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(external_led, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+  digitalWrite(external_led, HIGH);
 
   // we need a pretty high baud rate
   Serial.begin(921600);
@@ -132,6 +137,7 @@ void setup()
 
   // turn on LED for synchronisation with a camera
   digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+  digitalWrite(external_led, LOW);
 }
 
 void loop()
@@ -141,9 +147,11 @@ void loop()
     char c = Serial.read();
     if (c == 'r') {
       digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+      digitalWrite(external_led, HIGH);
       delay(100);
       myIMU.fifoClear();
       digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+      digitalWrite(external_led, LOW);
     }
   }
 
