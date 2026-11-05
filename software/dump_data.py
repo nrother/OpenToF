@@ -25,7 +25,13 @@ parser.add_argument(
     "-p", "--port", default="/dev/ttyACM0",
     help="Serial port the sensor is connected to (default: %(default)s)",
 )
+parser.add_argument(
+    "-o", "--output", default="-",
+    help="Output file (default: stdout)",
+)
 args = parser.parse_args()
+
+output_file = sys.stdout if args.output == "-" else open(args.output, "w", encoding="utf-8")
 
 ser = serial.Serial(args.port, BAUD, timeout=0)
 
@@ -39,7 +45,7 @@ first_packet_counter = None
 buffer = bytearray()
 last_counter = None
 
-print("counter,debugdata,gx,gy,gz,ax,ay,az")
+output_file.write("counter,debugdata,gx,gy,gz,ax,ay,az\n")
 
 try:
     while True:
@@ -109,11 +115,11 @@ try:
             ay *= ACCEL_SCALE
             az *= ACCEL_SCALE
 
-            print(
-                f"{counter},",
+            output_file.write(
+                f"{counter},"
                 f"{debugdata},"
                 f"{gx:.3f},{gy:.3f},{gz:.3f},"
-                f"{ax:.3f},{ay:.3f},{az:.3f}"
+                f"{ax:.3f},{ay:.3f},{az:.3f}\n"
             )
 except KeyboardInterrupt:
     stop_time = time.monotonic()
