@@ -39,11 +39,13 @@ ser = serial.Serial(args.port, BAUD, timeout=0)
 ser.write(b"r")
 ser.reset_input_buffer()
 
-start_time = time.monotonic()
+start_time = None
 first_packet_counter = None
+total_packets = 0
+last_counter = None
+last_packet_time = None
 
 buffer = bytearray()
-last_counter = None
 
 output_file.write("counter,debugdata,gx,gy,gz,ax,ay,az\n")
 
@@ -57,6 +59,8 @@ try:
         else:
             time.sleep(0.0005)
             continue
+
+        last_packet_time = time.monotonic()
 
         while True:
             # Find beginning of a packet.
@@ -103,8 +107,16 @@ try:
                     )
 
             last_counter = counter
-            if first_packet_counter is None:
-                first_packet_counter = counter
+            total_packets += 1
+
+            # start measuring after 10 packets to avoid startup jitter
+            if total_packets == 10:
+                start_time = time.monotonic()
+                if first_packet_counter is None:
+                    first_packet_counter = counter
+
+            if total_packets % 100 == 0:
+                print(f".", file=sys.stderr, end="", flush=True)
 
             # Convert raw integer values to physical units.
             gx *= GYRO_SCALE
@@ -122,11 +134,11 @@ try:
                 f"{ax:.3f},{ay:.3f},{az:.3f}\n"
             )
 except KeyboardInterrupt:
-    stop_time = time.monotonic()
     # reset board again for another sync point
     ser.write(b"r")
     
     # calculate the sensor data rate
-    duration = stop_time -  start_time - 0.1 # subtract 100ms because this is the LED blink duration
+    duration = last_packet_time -  start_time - 0.1 # subtract 100ms because this is the LED blink duration
     packet_count = (last_counter - first_packet_counter) & 0xFFFF # 16-bit unsigned, take into account overflows
+    print("", file=sys.stderr) # newline after the dots
     print(f"Got {packet_count} packets in {duration:.2f} s. Sensor data rate is {packet_count/duration:.2f} Hz", file=sys.stderr)
