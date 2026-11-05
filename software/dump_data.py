@@ -1,9 +1,9 @@
+import argparse
 import serial
 import struct
 import sys
 import time
 
-PORT = "/dev/ttyACM0"
 BAUD = 921600
 
 MARKER = b"\xAA\x55"
@@ -18,7 +18,16 @@ PACKET_SIZE = struct.calcsize(PACKET_FORMAT)  # 18 bytes
 ACCEL_SCALE = 0.061 * (16 >> 1) / 1000
 GYRO_SCALE = 4.375 * (2000 / 125) / 1000
 
-ser = serial.Serial(PORT, BAUD, timeout=0)
+parser = argparse.ArgumentParser(
+    description="Read data from the datalogger firmware and dump it to stdout in CSV format"
+)
+parser.add_argument(
+    "-p", "--port", default="/dev/ttyACM0",
+    help="Serial port the sensor is connected to (default: %(default)s)",
+)
+args = parser.parse_args()
+
+ser = serial.Serial(args.port, BAUD, timeout=0)
 
 # Reset board to sync
 ser.write(b"r")
