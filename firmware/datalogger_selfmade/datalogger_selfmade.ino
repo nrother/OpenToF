@@ -1,3 +1,5 @@
+//requires library "Seed Studio LSM6DS3" >= 2.0.8
+
 #include <Wire.h>
 #include <LSM6DS3.h>
 
@@ -6,9 +8,10 @@
 LSM6DS3 myIMU(I2C_MODE, 0x6A);
 
 // Maximum gyro rate is 1.66kHz, Accel would go up to 6.66kHz
-constexpr uint16_t SENSOR_ODR_HZ = 416;//208;//833;
-// FIFO rate should be the same, don't know why this is listed as 1600
-constexpr uint16_t FIFO_ODR_HZ = 400;
+constexpr uint16_t ODR_HZ = 416;//208;//833;
+
+// external LED to also flash for sync
+constexpr auto external_led = PA5;
 
 // if true, print in ASCII
 constexpr bool ascii_mode = false;
@@ -66,7 +69,9 @@ void sendSampleAscii(const ImuSample &sample)
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(external_led, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+  digitalWrite(external_led, HIGH);
 
   // we need a pretty high baud rate
   Serial.begin(921600);
@@ -77,19 +82,16 @@ void setup()
   pinMode(PD5, OUTPUT);
   digitalWrite(PD5, HIGH);
 
-  // set I2C to 400 kHz
-  Wire.setClock(400000);
-
   // Configure the IMU
   myIMU.settings.gyroEnabled = 1;
   myIMU.settings.gyroRange = 2000; //max deg/s
   myIMU.settings.gyroBandWidth = 400; //Hz
-  myIMU.settings.gyroSampleRate = SENSOR_ODR_HZ;
+  myIMU.settings.gyroSampleRate = ODR_HZ;
 
   myIMU.settings.accelEnabled = 1;
   myIMU.settings.accelRange = 16; //max g
   myIMU.settings.accelBandWidth = 400; //Hz
-  myIMU.settings.accelSampleRate = SENSOR_ODR_HZ;
+  myIMU.settings.accelSampleRate = ODR_HZ;
 
   // Include both sensors in the FIFO.
   myIMU.settings.gyroFifoEnabled = 1;
@@ -101,7 +103,7 @@ void setup()
   // myIMU.settings.timestampFifoEnabled = 1;
 
   // FIFO configuration.
-  myIMU.settings.fifoSampleRate = FIFO_ODR_HZ;
+  myIMU.settings.fifoSampleRate = ODR_HZ;
   myIMU.settings.fifoModeWord = 6; // continuous
   myIMU.settings.fifoThreshold = 512;
 
@@ -113,6 +115,8 @@ void setup()
     Serial.println("LSM6DS3 initialization failed");
     while (1);
   }
+  // set I2C to 400 kHz. Must be called after myIMU.begin()!
+  Wire1.setClock(400000);
 
   if (ascii_mode) {
     // write a header so this can be used as CSV file
@@ -132,6 +136,7 @@ void setup()
 
   // turn on LED for synchronisation with a camera
   digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+  digitalWrite(external_led, LOW);
 }
 
 void loop()
@@ -141,9 +146,11 @@ void loop()
     char c = Serial.read();
     if (c == 'r') {
       digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
+      digitalWrite(external_led, HIGH);
       delay(100);
       myIMU.fifoClear();
       digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
+      digitalWrite(external_led, LOW);
     }
   }
 
@@ -152,7 +159,6 @@ void loop()
 
   while (words >= 6)
   {
-
     // One complete gyro + accel sample
     ImuSample sample;
 
