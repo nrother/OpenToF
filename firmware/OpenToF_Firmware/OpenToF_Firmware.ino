@@ -6,7 +6,7 @@
  *   Boards manager URL : https://siliconlabs.github.io/arduino/package_arduinosilabs_index.json
  *   Board package      : "Silicon Labs" -> board "XIAO MG24 Sense"
  *   Tools > Protocol stack : "BLE (Arduino)"        (NOT "BLE (Silabs)")
- *   Libraries          : ArduinoBLE, "Seeed Arduino LSM6DS3" (>= 2.0.4)
+ *   Libraries          : ArduinoBLE, "Seeed Arduino LSM6DS3" (>= 2.0.8)
  */
 
 // ============================================================================

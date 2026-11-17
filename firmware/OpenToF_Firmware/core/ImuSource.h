@@ -42,7 +42,7 @@ class ImuSource : public TransitionSource {
     // _imu.settings.timestampFifoEnabled = 1;
 
     // FIFO configuration.
-    _imu.settings.fifoSampleRate = 400; //this is 416 Hz but this is the config constant used in the library
+    _imu.settings.fifoSampleRate = 416;
     _imu.settings.fifoModeWord = 6; // continuous
     _imu.settings.fifoThreshold = 512;
 
@@ -52,6 +52,9 @@ class ImuSource : public TransitionSource {
     _odrHz = 416;
 
     if (_imu.begin() != 0) return false;
+
+    // set I2C to 400 kHz. Must be called after myIMU.begin()!
+    Wire1.setClock(400000);
 
     _imu.fifoBegin();
 
