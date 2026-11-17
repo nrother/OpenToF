@@ -75,7 +75,7 @@ void setup()
 
   // we need a pretty high baud rate
   Serial.begin(921600);
-  
+
   while (!Serial);
 
   // turn on IMU power
