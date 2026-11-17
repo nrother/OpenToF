@@ -154,6 +154,7 @@ void setup() {
 #endif
   LOG(String("Algorithm: ") + source->name());
 
+  augmentDefaultDeviceName();
   loadDeviceName();
 
   if (!bleBegin(*source)) fatalBlink("BLE init failed");
