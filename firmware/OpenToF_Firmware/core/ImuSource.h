@@ -53,10 +53,17 @@ class ImuSource : public TransitionSource {
 
     if (_imu.begin() != 0) return false;
 
-    _periodUs = 1000000UL / 416;
-    _nextSampleUs = micros() + _periodUs;
-    _lastSampleUs = 0;
-    _logCounter = 0;
+    _imu.fifoBegin();
+
+    // workarround, the library always enables dataset 3 and 4
+    _imu.writeRegister(LSM6DS3_ACC_GYRO_FIFO_CTRL4, 0);
+
+    // wait a bit for everything to settle
+    delay(10);
+
+    // clear the FIFO, we are ready to go
+    _imu.fifoClear();
+
 #if DEBUG_SERIAL
     _heartbeatAtMs = millis() + IMU_HEARTBEAT_MS;
     _samplesSinceHeartbeat = 0;
@@ -113,28 +120,31 @@ class ImuSource : public TransitionSource {
     // First hand out anything the detector reported earlier.
     if (_detector.nextTransition(out)) return true;
 
-    // Fixed-rate sampling with micros(). Jitter from BLE.poll() can shift sample times by a
-    // few ms. If the algorithm needs exact timing, switch to the IMU data-ready interrupt
-    // or FIFO with hardware timestamps.
-    if ((int32_t)(micros() - _nextSampleUs) < 0) return false;
-    _nextSampleUs += _periodUs;
-    if ((int32_t)(micros() - _nextSampleUs) > (int32_t)(5 * _periodUs)) {
-      _nextSampleUs = micros() + _periodUs;  // fell far behind: resync
-    }
+    // Poll the FIFO
+    int16_t status = _imu.fifoGetStatus();
+    uint16_t words = status & 0x07FF;
+    _lastFifoLevel = words;
 
-    ImuData d;
-    if (!readSample(d)) {
-#if DEBUG_SERIAL
-      _i2cFailuresSinceHeartbeat++;
-#endif
-      return false;
-    }
-#if DEBUG_SERIAL
-    _samplesSinceHeartbeat++;
-#endif
+    while (words >= IMU_WORDS_PER_SAMPLE) {
+      ImuData d;
+      if (!readSample(d)) {
+  #if DEBUG_SERIAL
+        _i2cFailuresSinceHeartbeat++;
+  #endif
+        return false;
+      }
+  #if DEBUG_SERIAL
+      _samplesSinceHeartbeat++;
+  #endif
+      _detector.onSample(d);
 
-    _detector.onSample(d);
+      words -= IMU_WORDS_PER_SAMPLE;
+    }
     return _detector.nextTransition(out);
+  }
+
+  void clearFifo() {
+    _imu.fifoClear();
   }
 
  private:
@@ -147,8 +157,9 @@ class ImuSource : public TransitionSource {
   uint32_t _heartbeatAtMs = 0;
   uint32_t _samplesSinceHeartbeat = 0;
   uint32_t _i2cFailuresSinceHeartbeat = 0;
+  uint32_t _lastFifoLevel = 0;
 
-  // Prints "IMU: N samples in 2 s (~416 Hz, profile 416 Hz), M I2C read failures" every
+  // Prints "IMU: N samples in 2 s (~416 Hz, profile 416 Hz), last FIFO level = M, O I2C read failures" every
   // IMU_HEARTBEAT_MS, so a stalled IMU shows up even if you never watch the raw data.
   void heartbeat() {
     if ((int32_t)(millis() - _heartbeatAtMs) < 0) return;
@@ -157,7 +168,7 @@ class ImuSource : public TransitionSource {
     String line = String("IMU: ") + _samplesSinceHeartbeat + " samples in " +
                   (IMU_HEARTBEAT_MS / 1000) + " s (~" +
                   (_samplesSinceHeartbeat * 1000UL / IMU_HEARTBEAT_MS) + " Hz, target " +
-                  _odrHz + " Hz)";
+                  _odrHz + " Hz), last FIFO level = " + _lastFifoLevel;
     if (_i2cFailuresSinceHeartbeat > 0) {
       line += String(", ") + _i2cFailuresSinceHeartbeat + " I2C read failures";
     }
@@ -171,19 +182,34 @@ class ImuSource : public TransitionSource {
 
   bool writeReg(uint8_t offset, uint8_t value) { return _imu.writeRegister(offset, value) == IMU_SUCCESS; }
 
-  bool readSample(ImuData& d) {
-    int16_t gx, gy, gz, ax, ay, az;
-    if (!readRegPair(0x22, gx)) return false;  // OUTX_L_G
-    if (!readRegPair(0x24, gy)) return false;  // OUTY_L_G
-    if (!readRegPair(0x26, gz)) return false;  // OUTZ_L_G
-    if (!readRegPair(0x28, ax)) return false;  // OUTX_L_XL
-    if (!readRegPair(0x2A, ay)) return false;  // OUTY_L_XL
-    if (!readRegPair(0x2C, az)) return false;  // OUTZ_L_XL
+  // Native data format coming from the IMU
+  struct __attribute__((packed)) ImuSampleNative
+  {
+    int16_t gx;
+    int16_t gy;
+    int16_t gz;
+    int16_t ax;
+    int16_t ay;
+    int16_t az;
+  };
 
-    const uint64_t t = micros64();
-    d.timeUs = t;
-    d.dt = _lastSampleUs ? (float)(t - _lastSampleUs) * 1e-6f : 1.0f / _profile->odrHz;
-    _lastSampleUs = t;
+  static constexpr int IMU_WORDS_PER_SAMPLE = 6;
+  static_assert(sizeof(ImuSampleNative) == 2 * IMU_WORDS_PER_SAMPLE, "Unexpected packet size");
+
+  bool readSample(ImuData& d) {
+    // One complete gyro + accel sample
+    ImuSampleNative sample;
+    if (_imu.readRegisterRegion(
+      reinterpret_cast<uint8_t *>(&sample),
+      LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L,
+      sizeof(sample)
+    ) != IMU_SUCCESS) return false;
+
+    // the timing of the samples is fixed by the IMU hardware
+    const float dt = 1.0f / _odrHz;
+    d.dt = dt;
+    _lastSampleUs += dt;
+    d.timeUs = _lastSampleUs;
 
     const float gScale = 70.0f / 1000.0f;
     d.gx = sample.gx * gScale;
