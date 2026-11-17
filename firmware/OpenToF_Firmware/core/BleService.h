@@ -6,7 +6,6 @@
 
 #include "../config/BleUuids.h"
 #include "../config/FirmwareConfig.h"
-#include "BootCounter.h"
 #include "DeviceName.h"
 #include "Logging.h"
 #include "Micros64.h"
@@ -27,25 +26,15 @@ static const int INFO_BYTES = 7;
 static const int META_MAX_BYTES = 512;  // longest value a BLE attribute can hold
 static BLECharacteristic eventChar(UUID_EVENT, BLENotify, EVENT_FIXED_BYTES + EVENT_EXTRAS_MAX,
                                    false);
-static BLECharacteristic infoChar(UUID_INFO, BLERead, INFO_BYTES, true);
 static BLECharacteristic fieldsChar(UUID_FIELDS, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic reasonsChar(UUID_REASONS, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic confidenceKindChar(UUID_CONFIDENCE_KIND, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic nameChar(UUID_NAME, BLERead | BLEWrite, NAME_MAX_BYTES, false);
-#if DEEP_SLEEP_ACTIVE
-static const int COMMAND_BYTES = 1;
-// Variable length, so that an empty write shows up as length 0 instead of the previous value.
-static BLECharacteristic commandChar(UUID_COMMAND, BLEWrite, COMMAND_BYTES, false);
-#endif
 static BLEDescriptor eventDescription(SIG_DESC_USER_DESCRIPTION, DESC_EVENT);
-static BLEDescriptor infoDescription(SIG_DESC_USER_DESCRIPTION, DESC_INFO);
 static BLEDescriptor fieldsDescription(SIG_DESC_USER_DESCRIPTION, DESC_FIELDS);
 static BLEDescriptor reasonsDescription(SIG_DESC_USER_DESCRIPTION, DESC_REASONS);
 static BLEDescriptor confidenceKindDescription(SIG_DESC_USER_DESCRIPTION, DESC_CONFIDENCE_KIND);
 static BLEDescriptor nameDescription(SIG_DESC_USER_DESCRIPTION, DESC_NAME);
-#if DEEP_SLEEP_ACTIVE
-static BLEDescriptor commandDescription(SIG_DESC_USER_DESCRIPTION, DESC_COMMAND);
-#endif
 
 // ---- Battery service ----
 static BLEService batteryService(SIG_SVC_BATTERY);
@@ -76,8 +65,7 @@ static const uint8_t EVENT_STAGE_PROVISIONAL = 0;
 static const uint8_t EVENT_STAGE_FINAL = 1;
 static const uint8_t EVENT_STAGE_RETRACTED = 2;
 
-// Sends one event notification (layout in BleUuids.h). Dropped by the stack if nobody is
-// subscribed; nothing is buffered.
+// Sends one event notification. Dropped by the stack if nobody is subscribed
 static void bleNotifyEvent(uint16_t jumpId, bool landing, uint8_t stage, uint32_t timeMs,
                            const EventInfo& info) {
   uint8_t payload[EVENT_FIXED_BYTES + EVENT_EXTRAS_MAX];
@@ -91,27 +79,6 @@ static void bleNotifyEvent(uint16_t jumpId, bool landing, uint8_t stage, uint32_
   const uint8_t n = info.extrasLen <= EVENT_EXTRAS_MAX ? info.extrasLen : EVENT_EXTRAS_MAX;
   memcpy(payload + EVENT_FIXED_BYTES, info.extras, n);
   eventChar.writeValue(payload, EVENT_FIXED_BYTES + n);
-  if (!eventChar.subscribed()) {
-    // The algorithm IS detecting jumps; they just aren't reaching a phone. Usually: no app
-    // connected yet, or connected but hasn't enabled notifications on this characteristic.
-    LOG("event: no app subscribed, notification dropped");
-  }
-}
-
-// Info = {proto, boot count, current device time}; refreshed right before every read.
-static void updateInfo() {
-  uint8_t v[INFO_BYTES];
-  v[0] = PROTOCOL_VERSION;
-  v[1] = (uint8_t)bootCount;
-  v[2] = (uint8_t)(bootCount >> 8);
-  putU32LE(v + 3, (uint32_t)(micros64() / 1000ULL));
-  infoChar.writeValue(v, sizeof(v));
-}
-
-static void onInfoRead(BLEDevice central, BLECharacteristic characteristic) {
-  (void)central;
-  (void)characteristic;
-  updateInfo();
 }
 
 // Publishes an algorithm description string, cut to META_MAX_BYTES.
@@ -139,49 +106,18 @@ static void onNameWritten(BLEDevice central, BLECharacteristic characteristic) {
   bool ok = len >= 1 && len <= NAME_MAX_BYTES;
   if (ok) {
     characteristic.readValue(buf, len);
-    ok = trySetDeviceName(buf, (size_t)len);
+    ok = setDeviceName(buf, (size_t)len);
   }
   if (ok) {
     BLE.setLocalName(deviceName);
     BLE.setDeviceName(deviceName);
-    LOG(String("Name set to: ") + deviceName);  // flash write happens in loop()
+    LOG(String("Name set to: ") + deviceName);
   } else {
     // ArduinoBLE cannot reject a write, so restore the previous value.
     nameChar.writeValue((const uint8_t*)deviceName, strlen(deviceName));
     LOG("Rejected invalid device name");
   }
 }
-
-#if DEEP_SLEEP_ACTIVE
-// Set when the app asks for deep sleep; loop() does the work (see bleTakeSleepRequest()).
-// Lives in RAM only, so it is gone after the reset that ends a sleep.
-static bool bleSleepRequested = false;
-
-// A command counts once, when it is written: the stored value is cleared again right away and
-// never looked at outside of this handler.
-static void onCommandWritten(BLEDevice central, BLECharacteristic characteristic) {
-  (void)central;
-  uint8_t command = 0;
-  const int len = characteristic.valueLength();
-  if (len == COMMAND_BYTES) characteristic.readValue(&command, COMMAND_BYTES);
-  const uint8_t none = 0;
-  commandChar.writeValue(&none, COMMAND_BYTES);
-  if (len == COMMAND_BYTES && command == COMMAND_SLEEP) {
-    LOG("Command: sleep");
-    bleSleepRequested = true;
-  } else {
-    LOG(String("Ignored unknown command 0x") + String(command, HEX) + " (" + len + " bytes)");
-  }
-}
-
-// True once after the app sent the sleep command: asking clears the request, so a sleep attempt
-// that fails is not repeated.
-static bool bleTakeSleepRequest() {
-  const bool requested = bleSleepRequested;
-  bleSleepRequested = false;
-  return requested;
-}
-#endif
 
 static void onConnected(BLEDevice central) {
   (void)central;
@@ -193,7 +129,7 @@ static void onDisconnected(BLEDevice central) {
   LOG("BLE disconnected");
 }
 
-// Starts the BLE stack and registers all services. Call after loadDeviceName().
+// Starts the BLE stack and registers all services.
 // `algorithm` (the active jump detector or the demo) is described over BLE: its name as the
 // Software Revision String (cut to DIS_STRING_MAX bytes), its field/reason/confidence strings in
 // the Fields, Reasons and Confidence kind characteristics. Returns false if the stack fails to start.
@@ -209,45 +145,36 @@ static bool bleBegin(const TransitionSource& algorithm) {
 
   // Descriptors must be attached before the service is added.
   eventChar.addDescriptor(eventDescription);
-  infoChar.addDescriptor(infoDescription);
   fieldsChar.addDescriptor(fieldsDescription);
   reasonsChar.addDescriptor(reasonsDescription);
   confidenceKindChar.addDescriptor(confidenceKindDescription);
   nameChar.addDescriptor(nameDescription);
-#if DEEP_SLEEP_ACTIVE
-  commandChar.addDescriptor(commandDescription);
-#endif
 
   jumpService.addCharacteristic(eventChar);
-  jumpService.addCharacteristic(infoChar);
   jumpService.addCharacteristic(fieldsChar);
   jumpService.addCharacteristic(reasonsChar);
   jumpService.addCharacteristic(confidenceKindChar);
   jumpService.addCharacteristic(nameChar);
-#if DEEP_SLEEP_ACTIVE
-  jumpService.addCharacteristic(commandChar);
-#endif
+
   batteryService.addCharacteristic(batteryLevelChar);
+
   deviceInfoService.addCharacteristic(manufacturerNameChar);
   deviceInfoService.addCharacteristic(modelNumberChar);
   deviceInfoService.addCharacteristic(serialNumberChar);
   deviceInfoService.addCharacteristic(hardwareRevisionChar);
   deviceInfoService.addCharacteristic(firmwareRevisionChar);
   deviceInfoService.addCharacteristic(softwareRevisionChar);
+
   BLE.addService(jumpService);
   BLE.addService(batteryService);
   BLE.addService(deviceInfoService);
 
   nameChar.writeValue((const uint8_t*)deviceName, strlen(deviceName));
   nameChar.setEventHandler(BLEWritten, onNameWritten);
-#if DEEP_SLEEP_ACTIVE
-  commandChar.setEventHandler(BLEWritten, onCommandWritten);
-#endif
-  updateInfo();
-  infoChar.setEventHandler(BLERead, onInfoRead);
-  setMetaString(fieldsChar, "fieldsJson()", algorithm.fieldsJson());
-  setMetaString(reasonsChar, "reasonsJson()", algorithm.reasonsJson());
-  setMetaString(confidenceKindChar, "confidenceKind()", algorithm.confidenceKind());
+
+  setMetaString(fieldsChar, "fieldsJson", algorithm.fieldsJson());
+  setMetaString(reasonsChar, "reasonsJson", algorithm.reasonsJson());
+  setMetaString(confidenceKindChar, "confidenceKind", algorithm.confidenceKind());
 
   manufacturerNameChar.writeValue(MANUFACTURER_NAME);
   modelNumberChar.writeValue(MODEL_NUMBER);
@@ -269,19 +196,6 @@ static void bleStartAdvertising() {
 // True while an app is connected (as of the last blePoll()).
 static bool bleIsConnected = false;
 static bool bleConnected() { return bleIsConnected; }
-
-// Disconnects the app, if one is connected. The stack is serviced for BLE_SLEEP_COMMAND_DELAY_MS
-// first, so that the response to the app's last write is sent before the link goes down.
-// Advertising is not restarted here: the next blePoll() does that.
-static void bleDisconnect() {
-  if (!BLE.connected()) return;
-  const uint32_t startMs = millis();
-  while (millis() - startMs < BLE_SLEEP_COMMAND_DELAY_MS) BLE.poll();
-  if (BLE.disconnect()) LOG("BLE disconnected by the sensor");
-#if DEEP_SLEEP_ACTIVE
-  bleSleepRequested = false;  // a command repeated while waiting above belongs to this attempt
-#endif
-}
 
 // Stops advertising and shuts the BLE stack down (before deep sleep).
 static void bleEnd() {

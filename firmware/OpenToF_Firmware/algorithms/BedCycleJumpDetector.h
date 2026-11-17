@@ -49,9 +49,6 @@ class BedCycleJumpDetector : public JumpDetector {
  public:
   const char* name() const override { return "BedCycle v2"; }
 
-  // Landings peak near 16 g; an 8 g range would clip the landing dip.
-  const ImuProfile& imuProfile() const override { return PROFILE_833HZ_16G; }
-
   const char* confidenceKind() const override { return "heuristic"; }
   const char* reasonsJson() const override {
     return "[\"fast/final disagree\",\"timeout fallback\",\"weak push\",\"contact out of range\","

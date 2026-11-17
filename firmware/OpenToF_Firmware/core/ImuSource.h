@@ -1,4 +1,4 @@
-// IMU source: samples the LSM6DS3 at the profile's rate and feeds the active JumpDetector.
+// IMU source: samples the LSM6DS3 at 433 Hz and feeds the active JumpDetector.
 #pragma once
 
 #include <Arduino.h>
@@ -18,38 +18,45 @@ class ImuSource : public TransitionSource {
       : _detector(detector), _imu(I2C_MODE, IMU_I2C_ADDRESS) {}
 
   bool begin() {
-    _profile = &_detector.imuProfile();
-
     pinMode(IMU_POWER_PIN, OUTPUT);
-    digitalWrite(IMU_POWER_PIN, HIGH);  // the IMU only answers once PD5 powers it
-    delay(20);
-    Wire.begin();
+    digitalWrite(IMU_POWER_PIN, HIGH);  // turn the IMU on
 
-    // Fast I2C, set here (before _imu.begin(), which does its own I2C traffic) to match
-    // firmware/datalogger_selfmade/, a minimal known-working reference sketch for this
-    // exact board. NOTE: this ordering was once suspected to be the fix for a "no IMU data"
-    // bug; it wasn't (see readRegPair() below for the actual cause) -- kept because it's
-    // harmless and matches the reference, not because it's known to matter.
-    Wire.setClock(400000);
-
+    // Configure the IMU
     _imu.settings.gyroEnabled = 1;
-    _imu.settings.gyroRange = _profile->gyroRangeDps;
-    _imu.settings.gyroSampleRate = _profile->odrHz;
+    _imu.settings.gyroRange = 2000; //max deg/s
+    _imu.settings.gyroBandWidth = 400; //Hz
+    _imu.settings.gyroSampleRate = 416;
+
     _imu.settings.accelEnabled = 1;
-    _imu.settings.accelRange = _profile->accelRangeG;
-    _imu.settings.accelSampleRate = _profile->odrHz;
-    _imu.settings.accelBandWidth = _profile->accelBandwidthHz;
+    _imu.settings.accelRange = 16; //max g
+    _imu.settings.accelBandWidth = 400; //Hz
+    _imu.settings.accelSampleRate = 416;
+
+    // Include both sensors in the FIFO.
+    _imu.settings.gyroFifoEnabled = 1;
+    _imu.settings.gyroFifoDecimation = 1;
+
+    _imu.settings.accelFifoEnabled = 1;
+    _imu.settings.accelFifoDecimation = 1;
+
+    // _imu.settings.timestampFifoEnabled = 1;
+
+    // FIFO configuration.
+    _imu.settings.fifoSampleRate = 400; //this is 416 Hz but this is the config constant used in the library
+    _imu.settings.fifoModeWord = 6; // continuous
+    _imu.settings.fifoThreshold = 512;
+
+    // Temperature is unnecessary
     _imu.settings.tempEnabled = 0;
+
+    _odrHz = 416;
 
     if (_imu.begin() != 0) return false;
 
-    _periodUs = 1000000UL / _profile->odrHz;
+    _periodUs = 1000000UL / 416;
     _nextSampleUs = micros() + _periodUs;
     _lastSampleUs = 0;
     _logCounter = 0;
-#if IMU_SERIAL_LOG
-    Serial.println("t_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps");
-#endif
 #if DEBUG_SERIAL
     _heartbeatAtMs = millis() + IMU_HEARTBEAT_MS;
     _samplesSinceHeartbeat = 0;
@@ -59,18 +66,14 @@ class ImuSource : public TransitionSource {
     return true;
   }
 
-  const ImuProfile& profile() const { return *_profile; }
-
-  // ---- Deep sleep (see DeepSleep.h) ----
+  // ---- Deep sleep ----
 
   // Switches the IMU from measuring to its low-power "wake-up" function: accelerometer only at
   // 26 Hz, and a latched interrupt flag that is set once the acceleration changes by more than
   // the threshold. Call right before deep sleep; begin() is needed to measure again.
-  // Returns false if the IMU did not take the configuration (then do not sleep: it would
-  // never report motion).
+  // Returns false if the IMU did not take the configuration
   bool armWakeOnMotion() {
     bool ok = writeReg(0x12, 0x01);  // CTRL3_C: software reset
-    delay(20);
     ok = ok && writeReg(0x10, 0x20);             // CTRL1_XL: accel 26 Hz, +-2 g (gyro stays off)
     ok = ok && writeReg(0x5B, IMU_WAKE_UP_THS);  // WAKE_UP_THS
     ok = ok && writeReg(0x5C, IMU_WAKE_UP_DUR);  // WAKE_UP_DUR
@@ -85,9 +88,11 @@ class ImuSource : public TransitionSource {
   // After a wake-up from deep sleep: true if the IMU saw motion since armWakeOnMotion() (reading
   // the flag clears it). Also true if the IMU does not answer, so that the caller does a normal
   // start instead of sleeping without a working wake-up source.
-  // Must not touch IMU_POWER_PIN (see DeepSleep.h), so no begin() here: the library's begin()
-  // only adds Wire1.begin() to the pin setup, which is done here instead.
   bool motionSinceSleep() {
+    // We cannot use _imu.begin() here: This calls pinMode(OUTPUT) on the power-pin which causes
+    // the pin to glitch to LOW (see bug https://github.com/SiliconLabsSoftware/arduino/issues/209)
+    // This is not a real problem: The only other thing that _imu.begin() does it calling Wire1.begin(),
+    // which we can do here
     Wire1.begin();
     uint8_t value;
     if (_imu.readRegister(&value, 0x0F) != IMU_SUCCESS || value != 0x6A) return true;  // WHO_AM_I
@@ -128,25 +133,6 @@ class ImuSource : public TransitionSource {
     _samplesSinceHeartbeat++;
 #endif
 
-#if IMU_SERIAL_LOG
-    if (++_logCounter >= IMU_SERIAL_LOG_EVERY_N) {
-      _logCounter = 0;
-      Serial.print((uint32_t)(d.timeUs / 1000));
-      Serial.print(',');
-      Serial.print(d.ax, 3);
-      Serial.print(',');
-      Serial.print(d.ay, 3);
-      Serial.print(',');
-      Serial.print(d.az, 3);
-      Serial.print(',');
-      Serial.print(d.gx, 1);
-      Serial.print(',');
-      Serial.print(d.gy, 1);
-      Serial.print(',');
-      Serial.println(d.gz, 1);
-    }
-#endif
-
     _detector.onSample(d);
     return _detector.nextTransition(out);
   }
@@ -154,11 +140,8 @@ class ImuSource : public TransitionSource {
  private:
   JumpDetector& _detector;
   LSM6DS3 _imu;
-  const ImuProfile* _profile = &PROFILE_416HZ_8G;
-  uint32_t _periodUs = 2404;
-  uint32_t _nextSampleUs = 0;
+  uint32_t _odrHz;
   uint64_t _lastSampleUs = 0;
-  uint16_t _logCounter = 0;
 
 #if DEBUG_SERIAL
   uint32_t _heartbeatAtMs = 0;
@@ -173,33 +156,18 @@ class ImuSource : public TransitionSource {
 
     String line = String("IMU: ") + _samplesSinceHeartbeat + " samples in " +
                   (IMU_HEARTBEAT_MS / 1000) + " s (~" +
-                  (_samplesSinceHeartbeat * 1000UL / IMU_HEARTBEAT_MS) + " Hz, profile " +
-                  _profile->odrHz + " Hz)";
+                  (_samplesSinceHeartbeat * 1000UL / IMU_HEARTBEAT_MS) + " Hz, target " +
+                  _odrHz + " Hz)";
     if (_i2cFailuresSinceHeartbeat > 0) {
       line += String(", ") + _i2cFailuresSinceHeartbeat + " I2C read failures";
     }
-    if (_samplesSinceHeartbeat == 0) {
-      line += "  !! NO DATA -- check wiring, IMU_POWER_PIN, IMU_I2C_ADDRESS";
-    }
+
     LOG(line);
 
     _samplesSinceHeartbeat = 0;
     _i2cFailuresSinceHeartbeat = 0;
   }
 #endif
-
-  // Reads one axis register pair (e.g. OUTX_L_G/OUTX_H_G) via the library's own
-  // readRegisterInt16(), the exact call the library's readFloatAccelX()/readFloatGyroX() etc.
-  // use internally. Returns false (and leaves *out untouched) on an I2C error.
-  //
-  // We used to do this as a single 12-byte burst read (gyro X..Z + accel X..Z in one
-  // transaction from register 0x22). That silently failed 100% of the time on real hardware
-  // (confirmed with a live I2C scan and a side-by-side comparison against these exact library
-  // calls on the same bus) even though the addresses, power-up sequence and I2C clock were all
-  // correct -- six separate 2-byte reads, as the library itself always does, do not have that
-  // problem. Six transactions instead of one costs a bit of I2C time (well under the sample
-  // period even at 833 Hz), which is the trade-off for using the proven-working access pattern.
-  bool readRegPair(uint8_t offset, int16_t& out) { return _imu.readRegisterInt16(&out, offset) == IMU_SUCCESS; }
 
   bool writeReg(uint8_t offset, uint8_t value) { return _imu.writeRegister(offset, value) == IMU_SUCCESS; }
 
@@ -217,13 +185,13 @@ class ImuSource : public TransitionSource {
     d.dt = _lastSampleUs ? (float)(t - _lastSampleUs) * 1e-6f : 1.0f / _profile->odrHz;
     _lastSampleUs = t;
 
-    const float gScale = _profile->gyroMdpsPerLsb / 1000.0f;
-    d.gx = gx * gScale;
-    d.gy = gy * gScale;
-    d.gz = gz * gScale;
-    d.ax = ax / _profile->accelLsbPerG;
-    d.ay = ay / _profile->accelLsbPerG;
-    d.az = az / _profile->accelLsbPerG;
+    const float gScale = 70.0f / 1000.0f;
+    d.gx = sample.gx * gScale;
+    d.gy = sample.gy * gScale;
+    d.gz = sample.gz * gScale;
+    d.ax = sample.ax / 2048.0f;
+    d.ay = sample.ay / 2048.0f;
+    d.az = sample.az / 2048.0f;
     return true;
   }
 };
