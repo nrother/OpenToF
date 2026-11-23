@@ -14,9 +14,6 @@
 // jump-detection algorithm that gets built.
 // ============================================================================
 
-// #include "algorithms/MyJumpDetector.h"
-// typedef MyJumpDetector ActiveJumpDetector;
-
 // #include "algorithms/StaLtaJumpDetector.h"
 // typedef StaLtaJumpDetector ActiveJumpDetector;
 

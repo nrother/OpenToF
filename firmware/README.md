@@ -29,8 +29,8 @@ arduino-cli compile --fqbn SiliconLabs:silabs:xiao_mg24:protocol_stack=ble_ardui
 | `OpenToF_Firmware.ino` | Only `setup()` and `loop()`, plus the algorithm selection block at the top |
 | `config/FirmwareConfig.h` | Every setting: modes, version and identity strings, timing, pins |
 | `config/BleUuids.h` | All BLE UUIDs and the protocol description |
-| `algorithms/` | One header per detection algorithm, plus `BatteryCurve.h` (voltage → %) |
-| `core/` | Plumbing you normally don't edit: IMU, demo source, event rules, BLE service, battery, device name, boot counter, deep sleep |
+| `algorithms/` | One header per detection algorithm |
+| `core/` | Plumbing you normally don't edit: IMU, demo source, event rules, BLE service, battery, device name, deep sleep |
 
 Headers include each other relative to their own folder (`../core/Logging.h`); the sketch folder is not on the
 include path. The Arduino IDE only shows files in the sketch folder itself as tabs, so open the headers in another
@@ -44,8 +44,6 @@ free function in the `.ino` must not use a sketch-defined type in its signature.
 | Setting | Default | Meaning |
 |---|---|---|
 | `DEMO_MODE` | 0 | 1 = send simulated jumps instead of reading the IMU (two-stage events, confidence, intensities, occasional retracted landings); for testing the app without a trampoline. Disables deep sleep. |
-| `IMU_USE_HIGH_RATE_PROFILE` | 0 | IMU profile if the detector doesn't choose one: 0 = 416 Hz / ±8 g, 1 = 833 Hz / ±16 g |
-| `IMU_SERIAL_LOG` | 0 | 1 = print IMU samples as CSV over serial (every `IMU_SERIAL_LOG_EVERY_N`th) |
 | `DEBUG_SERIAL` | 1 | Diagnostic messages over serial (115200 baud); 0 compiles them out |
 | `DEEP_SLEEP_ENABLED` | 1 | Sleep when idle, wake up on motion |
 | `SLEEP_AFTER_IDLE_MS` | 60 s | Idle time (no app connected, no jump) before sleeping |
@@ -64,23 +62,10 @@ ActiveJumpDetector;` pair, and exactly one pair is not commented out.
 | `StaLtaJumpDetector` | STA/LTA envelope detector |
 | `AzPipelineJumpDetector` | Causal port of the vertical-acceleration pipeline |
 | `AzPipelineBufferedJumpDetector` | Buffered variant; reports ~1 s late, which breaks the 200 ms deadline for final events |
-| `MyJumpDetector` | Template with an illustration, not a working detector |
 
-To write your own: copy `algorithms/MyJumpDetector.h`, rename the class, implement `onSample()`, and add a pair for
+To write your own: copy a file in `algorithms/`, rename the class, implement `onSample()`, and add a pair for
 it in the selection block. The API and the rules for events are in
-[`../docs/PROTOCOL.md`](../docs/PROTOCOL.md#writing-a-detection-algorithm). To see what the data looks like, set
-`IMU_SERIAL_LOG 1` and watch the Serial Monitor or Plotter while someone bounces.
-
-## Debugging over serial
-
-With `DEBUG_SERIAL 1` the firmware logs to serial (115200 baud). When the app shows no jumps, read it top to bottom:
-
-- No `IMU:` lines at all: check `DEBUG_SERIAL` and the baud rate.
-- `IMU: 0 samples … NO DATA`: the I2C reads fail.
-- A healthy sample rate (~285/s with the 833 Hz profile, which is expected) but no `takeoff`/`landing` lines: the
-  algorithm doesn't fire.
-- `event ignored: …` lines: the algorithm reports events in an invalid order (see the event rules in the protocol).
-- Events are logged but the app sees nothing: look for "no app subscribed" (not connected, or notifications off).
+[`../docs/PROTOCOL.md`](../docs/HOWTO_JUMP_DETECTOR.md).
 
 ## Deep sleep
 
@@ -146,7 +131,7 @@ Standalone sketches, not part of the main firmware and without a version number:
 
 | Sketch | Purpose |
 |---|---|
-| `datalogger_selfmade/` | Streams raw IMU samples (binary, 921600 baud) for recording data; read them with `../software/dump_data.py` and plot with `../software/visualizer/plot.py`. Send `r` to clear the FIFO. |
+| `datalogger/` | Streams raw IMU samples (binary, 921600 baud) for recording data; read them with `../software/dump_data.py` and plot with `../software/visualizer/plot.py`. Send `r` to clear the FIFO. |
 | `deep_sleep_test/` | Experiments for deep sleep / wake on motion, including the attempt to read the IMU before `main()` |
 | `ble_test/` | Early BLE test with the "BLE (Silabs)" stack (random flight times); superseded by `DEMO_MODE` |
 

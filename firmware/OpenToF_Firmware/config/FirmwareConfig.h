@@ -14,7 +14,6 @@
 
 // While DEBUG_SERIAL is on and DEMO_MODE is 0, print one summary line this often: how many IMU
 // samples arrived and how many I2C reads failed.
-// #define IMU_HEARTBEAT_MS 2000UL
 #define IMU_HEARTBEAT_MS 1000UL
 
 // ============================================================================

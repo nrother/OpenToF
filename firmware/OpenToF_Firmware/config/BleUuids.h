@@ -20,7 +20,7 @@
 // "Characteristic User Description" descriptors (0x2901).
 // A service cannot carry a description, the standard characteristics are well-known.
 #define SIG_DESC_USER_DESCRIPTION "2901"
-#define DESC_EVENT "Detected devents"
+#define DESC_EVENT "Detected events"
 #define DESC_FIELDS "Custom event fields metadata"
 #define DESC_REASONS "Reason bit metadata"
 #define DESC_CONFIDENCE_KIND "Confidence kind"

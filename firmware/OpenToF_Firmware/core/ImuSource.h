@@ -39,8 +39,6 @@ class ImuSource : public TransitionSource {
     _imu.settings.accelFifoEnabled = 1;
     _imu.settings.accelFifoDecimation = 1;
 
-    // _imu.settings.timestampFifoEnabled = 1;
-
     // FIFO configuration.
     _imu.settings.fifoSampleRate = 416;
     _imu.settings.fifoModeWord = 6; // continuous
@@ -58,7 +56,7 @@ class ImuSource : public TransitionSource {
 
     _imu.fifoBegin();
 
-    // workarround, the library always enables dataset 3 and 4
+    // workaround, the library always enables dataset 3 and 4
     _imu.writeRegister(LSM6DS3_ACC_GYRO_FIFO_CTRL4, 0);
 
     // wait a bit for everything to settle

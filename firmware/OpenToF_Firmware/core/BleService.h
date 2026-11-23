@@ -8,7 +8,6 @@
 #include "../config/FirmwareConfig.h"
 #include "DeviceName.h"
 #include "Logging.h"
-#include "Micros64.h"
 #include "Transition.h"
 
 // Longest string a Device Information characteristic can hold.
@@ -22,7 +21,6 @@ DIS_CHECK(MODEL_NUMBER);
 // ---- Jump service ----
 static BLEService jumpService(UUID_JUMP_SERVICE);
 static const int EVENT_FIXED_BYTES = 10;
-static const int INFO_BYTES = 7;
 static const int META_MAX_BYTES = 512;  // longest value a BLE attribute can hold
 static BLECharacteristic eventChar(UUID_EVENT, BLENotify, EVENT_FIXED_BYTES + EVENT_EXTRAS_MAX,
                                    false);

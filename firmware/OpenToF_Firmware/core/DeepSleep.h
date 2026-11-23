@@ -2,7 +2,7 @@
 //
 // The board does not connect the IMU's interrupt pins, so the IMU cannot wake the MCU directly.
 // Instead the MCU sleeps in EM4 and a timer (BURTC) wakes it every SLEEP_POLL_INTERVAL_MS. After
-// wakeup the MCU is reset, this case is dected in setup(). We ask the IMU whether it saw motion
+// wakeup the MCU is reset, this case is detected in setup(). We ask the IMU whether it saw motion
 // in the meantime (latched wake-up interrupt, see ImuSource::motionSinceSleep()) and, if not, 
 // sleep again right away.
 //
