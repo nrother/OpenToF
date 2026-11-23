@@ -41,21 +41,9 @@ args = parser.parse_args()
 output_file = sys.stdout if args.output == "-" else open(args.output, "w", encoding="utf-8")
 
 ser = serial.Serial(args.port, BAUD, timeout=0)
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Reads OpenToF raw IMU packets from the datalogger firmware's serial port and "
-        "prints them as CSV (counter,debugdata,gx,gy,gz,ax,ay,az) to stdout."
-    )
-    parser.add_argument(
-        "-p", "--port", default="COM4",
-        help="Serial port the sensor is connected to (default: %(default)s)",
-    )
-    parser.add_argument(
-        "-b", "--baud", type=int, default=921600,
-        help="Serial baud rate (default: %(default)s)",
-    )
-    return parser.parse_args()
+# Reset board to sync
+ser.write(b"r")
+ser.reset_input_buffer()
 
 start_time = None
 first_packet_counter = None
