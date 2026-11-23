@@ -1,4 +1,5 @@
 __pycache__
+.venv/
 
 # IDE/tooling artifacts that can land at the repo root if it's opened as a single project
 # (Flutter/Android-specific ignores of the same kind live in app/.gitignore).
