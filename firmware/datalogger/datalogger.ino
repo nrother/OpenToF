@@ -155,7 +155,7 @@ void loop()
   }
 
   int16_t status = myIMU.fifoGetStatus();
-  uint16_t words = status & 0x0FFF;
+  uint16_t words = status & 0x07FF;
 
   while (words >= 6)
   {
