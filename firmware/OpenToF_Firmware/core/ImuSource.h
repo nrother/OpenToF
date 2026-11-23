@@ -1,4 +1,4 @@
-// IMU source: samples the LSM6DS3 at 433 Hz and feeds the active JumpDetector.
+// IMU source: samples the LSM6DS3 FIFO and feeds the active JumpDetector.
 #pragma once
 
 #include <Arduino.h>
@@ -6,16 +6,14 @@
 #include <Wire.h>
 
 #include "../config/FirmwareConfig.h"
-#include "ImuTypes.h"
-#include "JumpDetector.h"
-#include "Logging.h"
-#include "Micros64.h"
-#include "Transition.h"
+#include "ImuSampleSource.h"
 
-class ImuSource : public TransitionSource {
+#define IMU_SAMPLE_RATE_HZ 416
+
+class ImuSource : public ImuSampleSource {
  public:
   explicit ImuSource(JumpDetector& detector)
-      : _detector(detector), _imu(I2C_MODE, IMU_I2C_ADDRESS) {}
+      : ImuSampleSource(detector), _imu(I2C_MODE, IMU_I2C_ADDRESS) {}
 
   bool begin() {
     pinMode(IMU_POWER_PIN, OUTPUT);
@@ -25,12 +23,12 @@ class ImuSource : public TransitionSource {
     _imu.settings.gyroEnabled = 1;
     _imu.settings.gyroRange = 2000; //max deg/s
     _imu.settings.gyroBandWidth = 400; //Hz
-    _imu.settings.gyroSampleRate = 416;
+    _imu.settings.gyroSampleRate = IMU_SAMPLE_RATE_HZ;
 
     _imu.settings.accelEnabled = 1;
     _imu.settings.accelRange = 16; //max g
     _imu.settings.accelBandWidth = 400; //Hz
-    _imu.settings.accelSampleRate = 416;
+    _imu.settings.accelSampleRate = IMU_SAMPLE_RATE_HZ;
 
     // Include both sensors in the FIFO.
     _imu.settings.gyroFifoEnabled = 1;
@@ -40,14 +38,12 @@ class ImuSource : public TransitionSource {
     _imu.settings.accelFifoDecimation = 1;
 
     // FIFO configuration.
-    _imu.settings.fifoSampleRate = 416;
+    _imu.settings.fifoSampleRate = IMU_SAMPLE_RATE_HZ;
     _imu.settings.fifoModeWord = 6; // continuous
     _imu.settings.fifoThreshold = 512;
 
     // Temperature is unnecessary
     _imu.settings.tempEnabled = 0;
-
-    _odrHz = 416;
 
     if (_imu.begin() != 0) return false;
 
@@ -65,12 +61,9 @@ class ImuSource : public TransitionSource {
     // clear the FIFO, we are ready to go
     _imu.fifoClear();
 
-#if DEBUG_SERIAL
-    _heartbeatAtMs = millis() + IMU_HEARTBEAT_MS;
-    _samplesSinceHeartbeat = 0;
-    _i2cFailuresSinceHeartbeat = 0;
-#endif
-    _detector.begin();
+    _sampleCount = 0;
+    _lastSampleUs = 0;
+    beginSamples();
     return true;
   }
 
@@ -108,115 +101,46 @@ class ImuSource : public TransitionSource {
     return (value & 0x08) != 0;                                                        // WU_IA
   }
 
-  const char* name() const override { return _detector.name(); }
-  const char* fieldsJson() const override { return _detector.fieldsJson(); }
-  const char* reasonsJson() const override { return _detector.reasonsJson(); }
-  const char* confidenceKind() const override { return _detector.confidenceKind(); }
-
   bool poll(Transition& out) override {
-#if DEBUG_SERIAL
-    heartbeat();
-#endif
-
     // First hand out anything the detector reported earlier.
-    if (_detector.nextTransition(out)) return true;
+    if (nextTransition(out)) return true;
 
     // Poll the FIFO
     int16_t status = _imu.fifoGetStatus();
     uint16_t words = status & 0x07FF;
 #if DEBUG_SERIAL
-    _lastFifoLevel = words;
+    heartbeat("IMU", "last FIFO level = ", words);
 #endif
 
     while (words >= IMU_WORDS_PER_SAMPLE) {
-      ImuData d;
-      if (!readSample(d)) {
-  #if DEBUG_SERIAL
-        _i2cFailuresSinceHeartbeat++;
-  #endif
+      RawImuSample sample;
+      if (!readSample(sample)) {
+        noteReadFailure();
         return false;
       }
-  #if DEBUG_SERIAL
-      _samplesSinceHeartbeat++;
-  #endif
-      _detector.onSample(d);
+      const float dt = 1.0f / IMU_SAMPLE_RATE_HZ;
+      _sampleCount++;
+      _lastSampleUs = (_sampleCount * 1000000ULL) / IMU_SAMPLE_RATE_HZ;
+      processSample(sample, _lastSampleUs, dt);
 
       words -= IMU_WORDS_PER_SAMPLE;
     }
-    return _detector.nextTransition(out);
+    return nextTransition(out);
   }
 
  private:
-  JumpDetector& _detector;
   LSM6DS3 _imu;
-  uint32_t _odrHz;
+  uint64_t _sampleCount = 0;
   uint64_t _lastSampleUs = 0;
-
-#if DEBUG_SERIAL
-  uint32_t _heartbeatAtMs = 0;
-  uint32_t _samplesSinceHeartbeat = 0;
-  uint32_t _i2cFailuresSinceHeartbeat = 0;
-  uint32_t _lastFifoLevel = 0;
-
-  // Prints "IMU: N samples in 2 s (~416 Hz, profile 416 Hz), last FIFO level = M, O I2C read failures" every
-  // IMU_HEARTBEAT_MS, so a stalled IMU shows up even if you never watch the raw data.
-  void heartbeat() {
-    if ((int32_t)(millis() - _heartbeatAtMs) < 0) return;
-    _heartbeatAtMs = millis() + IMU_HEARTBEAT_MS;
-
-    String line = String("IMU: ") + _samplesSinceHeartbeat + " samples in " +
-                  (IMU_HEARTBEAT_MS / 1000) + " s (~" +
-                  (_samplesSinceHeartbeat * 1000UL / IMU_HEARTBEAT_MS) + " Hz, target " +
-                  _odrHz + " Hz), last FIFO level = " + _lastFifoLevel;
-    if (_i2cFailuresSinceHeartbeat > 0) {
-      line += String(", ") + _i2cFailuresSinceHeartbeat + " I2C read failures";
-    }
-
-    LOG(line);
-
-    _samplesSinceHeartbeat = 0;
-    _i2cFailuresSinceHeartbeat = 0;
-  }
-#endif
 
   bool writeReg(uint8_t offset, uint8_t value) { return _imu.writeRegister(offset, value) == IMU_SUCCESS; }
 
   // Native data format coming from the IMU
-  struct __attribute__((packed)) ImuSampleNative
-  {
-    int16_t gx;
-    int16_t gy;
-    int16_t gz;
-    int16_t ax;
-    int16_t ay;
-    int16_t az;
-  };
-
   static constexpr int IMU_WORDS_PER_SAMPLE = 6;
-  static_assert(sizeof(ImuSampleNative) == 2 * IMU_WORDS_PER_SAMPLE, "Unexpected packet size");
 
-  bool readSample(ImuData& d) {
+  bool readSample(RawImuSample& sample) {
     // One complete gyro + accel sample
-    ImuSampleNative sample;
-    if (_imu.readRegisterRegion(
-      reinterpret_cast<uint8_t *>(&sample),
-      LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L,
-      sizeof(sample)
-    ) != IMU_SUCCESS) return false;
-
-    // the timing of the samples is fixed by the IMU hardware
-    const float dt = 1.0f / _odrHz;
-    d.dt = dt;
-    _lastSampleUs += dt;
-    d.timeUs = _lastSampleUs;
-
-    const float gScale = 70.0f / 1000.0f;
-    d.gx = sample.gx * gScale;
-    d.gy = sample.gy * gScale;
-    d.gz = sample.gz * gScale;
-    d.ax = sample.ax / 2048.0f;
-    d.ay = sample.ay / 2048.0f;
-    d.az = sample.az / 2048.0f;
+    if (_imu.readRegisterRegion(reinterpret_cast<uint8_t *>(&sample), LSM6DS3_ACC_GYRO_FIFO_DATA_OUT_L, sizeof(sample)) != IMU_SUCCESS) return false;
     return true;
   }
 };

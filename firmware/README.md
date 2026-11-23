@@ -44,12 +44,28 @@ free function in the `.ino` must not use a sketch-defined type in its signature.
 | Setting | Default | Meaning |
 |---|---|---|
 | `DEMO_MODE` | 0 | 1 = send simulated jumps instead of reading the IMU (two-stage events, confidence, intensities, occasional retracted landings); for testing the app without a trampoline. Disables deep sleep. |
+| `SERIAL_REPLAY_MODE` | 0 | Set to 1 to read IMU samples from Serial instead of the onboard IMU; disables deep sleep. |
 | `DEBUG_SERIAL` | 1 | Diagnostic messages over serial (115200 baud); 0 compiles them out |
 | `DEEP_SLEEP_ENABLED` | 1 | Sleep when idle, wake up on motion |
 | `SLEEP_AFTER_IDLE_MS` | 60 s | Idle time (no app connected, no jump) before sleeping |
 | `SLEEP_POLL_INTERVAL_MS` | 3 s | How often the sleeping sensor checks for motion |
 | `IMU_WAKE_UP_THS` / `_DUR` | 0x02 / 0x00 | How hard it must be moved to wake up |
 | `FIRMWARE_VERSION` | | Bump on every release (see "Releasing" in the root README) |
+
+### Replaying recorded IMU data
+
+Set `SERIAL_REPLAY_MODE` to `1` in `config/FirmwareConfig.h`, then build and upload the firmware. Stream a CSV
+recording to its serial port:
+
+```sh
+uv run software/replay_data.py recording.csv --port /dev/ttyACM0
+cat recording.csv | uv run software/replay_data.py --port /dev/ttyACM0
+```
+
+The script accepts CSV output from `software/dump_data.py`. It converts the recorded physical values back to int16 IMU counts and sends one 12-byte sample at a time.
+The sender paces samples at 416 Hz by default; use `--rate` to change this.
+The firmware timestamps samples from their actual arrival intervals and its heartbeat reports the measured rate.
+Its normal active jump detector processes the replay. The serial baud rate is 115200.
 
 ## Detection algorithms
 

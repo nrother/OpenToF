@@ -60,7 +60,7 @@ don't match.
 |---|---|
 | [`app/`](app/) | Flutter companion app (Android + iOS) |
 | [`firmware/`](firmware/) | Arduino sensor firmware (`OpenToF_Firmware/`) and helper/test sketches |
-| [`software/`](software/) | Python tools for recording and plotting raw IMU data (`uv run <script>`) |
+| [`software/`](software/) | Python tools for recording, replaying and plotting raw IMU data (`uv run <script>`) |
 | [`cad/`](cad/) | Parametric FreeCAD housing with trampoline clip, printable STLs |
 | [`img/`](img/) | Logo and wordmark sources (light and dark), `make_wordmark.py` |
 | [`docs/`](docs/) | Protocol, decisions, roadmap, figures and hardware datasheets |

@@ -8,22 +8,27 @@
 // 0 = use the real IMU + the active jump detector (picked at the top of the .ino).
 // 1 = simulate jumps instead
 #define DEMO_MODE 0
+// 1 = read datalogger binary packets from Serial instead of the onboard IMU.
+#define SERIAL_REPLAY_MODE 1
+
+#if DEMO_MODE && SERIAL_REPLAY_MODE
+#error "DEMO_MODE and SERIAL_REPLAY_MODE cannot both be enabled"
+#endif
 
 #define DEBUG_SERIAL 1
 #define SERIAL_BAUD 115200
 
-// While DEBUG_SERIAL is on and DEMO_MODE is 0, print one summary line this often: how many IMU
-// samples arrived and how many I2C reads failed.
+// While DEBUG_SERIAL is on, print one summary line this often with the measured sample rate.
 #define IMU_HEARTBEAT_MS 1000UL
 
 // ============================================================================
-// Deep sleep. Not used in DEMO_MODE.
+// Deep sleep. Disabled in DEMO_MODE and SERIAL_REPLAY_MODE.
 // ============================================================================
 
 // 1 = go to deep sleep when nothing happens, wake up again when the device is shaken/hit.
 #define DEEP_SLEEP_ENABLED 1
 
-#define DEEP_SLEEP_ACTIVE (DEEP_SLEEP_ENABLED && !DEMO_MODE)
+#define DEEP_SLEEP_ACTIVE (DEEP_SLEEP_ENABLED && !DEMO_MODE && !SERIAL_REPLAY_MODE)
 
 // Sleep after this long without a BLE connection and without a takeoff/landing.
 #define SLEEP_AFTER_IDLE_MS 60000UL

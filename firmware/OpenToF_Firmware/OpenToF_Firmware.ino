@@ -36,11 +36,15 @@ typedef BedCycleJumpDetector ActiveJumpDetector;
 #include "core/ImuSource.h"
 #include "core/JumpEventPublisher.h"
 #include "core/Logging.h"
+#include "core/SerialReplaySource.h"
 
 static ActiveJumpDetector detector;
 static ImuSource imuSource(detector);
 #if DEMO_MODE
 static DemoSource demoSource;
+#endif
+#if SERIAL_REPLAY_MODE
+static SerialReplaySource serialReplaySource(detector);
 #endif
 static TransitionSource* source = nullptr;
 static JumpEventPublisher publisher;
@@ -125,7 +129,7 @@ void setup() {
   if (wokenFromDeepSleep && !imuSource.motionSinceSleep()) deepSleepEnter();
 #endif
 
-#if DEBUG_SERIAL
+#if DEBUG_SERIAL || SERIAL_REPLAY_MODE
   Serial.begin(SERIAL_BAUD);
 #endif
   pinMode(LED_BUILTIN, OUTPUT);
@@ -144,7 +148,9 @@ void setup() {
   pinMode(RF_SWITCH_POWER_PIN, OUTPUT);
   digitalWrite(RF_SWITCH_POWER_PIN, HIGH);
 
-#if DEMO_MODE
+#if SERIAL_REPLAY_MODE
+  source = &serialReplaySource;
+#elif DEMO_MODE
   source = &demoSource;
 #else
   source = &imuSource;
@@ -161,6 +167,9 @@ void setup() {
 #if DEMO_MODE
   LOG("DEMO MODE: simulated jumps, IMU not used");
   demoSource.begin();
+#elif SERIAL_REPLAY_MODE
+  LOG("SERIAL REPLAY MODE: waiting for IMU samples on Serial");
+  serialReplaySource.begin();
 #else
   if (!imuSource.begin()) fatalBlink("IMU init failed");
 #endif
