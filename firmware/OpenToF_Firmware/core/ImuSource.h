@@ -124,7 +124,9 @@ class ImuSource : public TransitionSource {
     // Poll the FIFO
     int16_t status = _imu.fifoGetStatus();
     uint16_t words = status & 0x07FF;
+#if DEBUG_SERIAL
     _lastFifoLevel = words;
+#endif
 
     while (words >= IMU_WORDS_PER_SAMPLE) {
       ImuData d;
@@ -142,10 +144,6 @@ class ImuSource : public TransitionSource {
       words -= IMU_WORDS_PER_SAMPLE;
     }
     return _detector.nextTransition(out);
-  }
-
-  void clearFifo() {
-    _imu.fifoClear();
   }
 
  private:
