@@ -758,6 +758,18 @@ abstract class AppLocalizations {
   /// **'Confidence: {value} %'**
   String confidenceValue(int value);
 
+  /// No description provided for @protocolMismatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor uses a different protocol'**
+  String get protocolMismatchTitle;
+
+  /// No description provided for @protocolMismatchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its jumps are ignored. Update the sensor firmware or this app.'**
+  String get protocolMismatchBody;
+
   /// No description provided for @versionMismatchTitle.
   ///
   /// In en, this message translates to:
@@ -781,18 +793,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detection algorithm'**
   String get algorithmSection;
-
-  /// No description provided for @protocolVersionLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Protocol version'**
-  String get protocolVersionLabel;
-
-  /// No description provided for @bootCountLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Sensor starts'**
-  String get bootCountLabel;
 
   /// No description provided for @confidenceKindLabel.
   ///
@@ -1214,71 +1214,11 @@ abstract class AppLocalizations {
   /// **'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.'**
   String get ledRedSource;
 
-  /// No description provided for @connectionAsleep.
+  /// No description provided for @simRestart.
   ///
   /// In en, this message translates to:
-  /// **'Sensor asleep'**
-  String get connectionAsleep;
-
-  /// No description provided for @sleepSensor.
-  ///
-  /// In en, this message translates to:
-  /// **'Put sensor to sleep'**
-  String get sleepSensor;
-
-  /// No description provided for @sleepSensorHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Saves battery until you need the sensor again.'**
-  String get sleepSensorHelp;
-
-  /// No description provided for @sleepSensorNotConnected.
-  ///
-  /// In en, this message translates to:
-  /// **'Only possible while the sensor is connected.'**
-  String get sleepSensorNotConnected;
-
-  /// No description provided for @sleepSensorAsleep.
-  ///
-  /// In en, this message translates to:
-  /// **'The sensor is asleep. Shake or hit it to wake it up; the app then reconnects by itself.'**
-  String get sleepSensorAsleep;
-
-  /// No description provided for @sleepConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Put sensor to sleep?'**
-  String get sleepConfirmTitle;
-
-  /// No description provided for @sleepConfirmBody.
-  ///
-  /// In en, this message translates to:
-  /// **'The sensor disconnects, blinks 6 times and sleeps until it is moved.\n\nTo wake it up, shake or hit it: it reacts within about 4 seconds, and the app reconnects by itself.'**
-  String get sleepConfirmBody;
-
-  /// No description provided for @sleepAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Put to sleep'**
-  String get sleepAction;
-
-  /// No description provided for @sleepStarted.
-  ///
-  /// In en, this message translates to:
-  /// **'The sensor is going to sleep. Shake or hit it to wake it up.'**
-  String get sleepStarted;
-
-  /// No description provided for @sleepFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not put the sensor to sleep: {message}'**
-  String sleepFailed(String message);
-
-  /// No description provided for @simWake.
-  ///
-  /// In en, this message translates to:
-  /// **'Simulate wake-up'**
-  String get simWake;
+  /// **'Simulate sensor restart'**
+  String get simRestart;
 
   /// No description provided for @changelogTileHelp.
   ///

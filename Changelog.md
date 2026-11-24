@@ -9,6 +9,39 @@ firmware 0.4.x, and older firmware (≤ 0.3.2) no longer works with the new app 
 
 For the reasoning behind individual choices see `docs/DECISIONS.md`; this file only says what changed.
 
+## 0.7.0 — unreleased (2026-11-24)
+
+**App 0.7.0** (build 6) and **firmware 0.7.0**. New BLE protocol 2: app 0.7.0 needs firmware 0.7.0. Firmware
+with protocol 1 no longer works with the new app (and vice versa).
+
+### Sensor firmware
+- **New detector `TofNetJumpDetector`** (tof_net, a small neural network) replaces `BedCycleJumpDetector` as
+  the built-in algorithm. It reports final events only, up to about 170 ms after the event, without confidence,
+  reasons or custom fields. **Known issue:** it needs about 83 % of the processor time, so under Bluetooth load
+  samples can be lost.
+- **Building** the firmware needs the Seeed Arduino LSM6DS3 library 2.0.8 or newer; older versions read the
+  motion sensor at only 12.5 instead of 416 samples per second.
+- **Default name:** a new sensor is called `OpenToF` followed by the last four characters of its serial number.
+- **Fixed IMU settings:** the sensor always samples at 416 Hz, ±16 g, ±2000 °/s; algorithms can no longer pick
+  a profile (`imuProfile()` is gone).
+- **Removed:** the sleep command and the Info characteristic (boot counter, device time). The sensor still goes
+  to sleep by itself after 1 minute without an app.
+
+### App
+- **Removed: "Put sensor to sleep"** and the "Sensor asleep" status, and the protocol version on the sensor page.
+- **New warning** when the sensor uses a different protocol: its jumps are ignored, and the app asks you to
+  update the sensor firmware or the app.
+- **Changed: sensor restarts** are recognised from the jump numbers and event times instead of a boot counter.
+  The first jump after a restart has no time on bed.
+
+## 0.6.1 — unreleased (2026-11-24)
+
+**Firmware 0.6.1** (app remains 0.6.0).
+
+### Sensor firmware
+- IMU sample timestamps now follow a software PLL that acquires the actual sample rate over its first 5-second sample window, then low-pass filters measurements and tracks slow clock drift.
+- Serial replay keeps the PLL rate estimate during pauses, unlocks after one heartbeat without data, and excludes the first second after samples resume from rate estimation.
+
 ## 0.6.0 — unreleased (2026-10-14)
 
 **App 0.6.0** (build 5) and **firmware 0.6.0**. Still BLE protocol 1: the new sleep command is optional, so
@@ -25,14 +58,6 @@ app 0.6.0 also works with firmware 0.5.0 (just without the sleep button), but it
 - **Changelog in the app:** Settings → Version shows what changed in each release, with separate tabs for the
   app and the sensor firmware.
 - **LED help page:** now also explains the red charge LED.
-
-## 0.6.1 — unreleased (2026-11-24)
-
-**Firmware 0.6.1** (app remains 0.6.0).
-
-### Sensor firmware
-- IMU sample timestamps now follow a software PLL that acquires the actual sample rate over its first 5-second sample window, then low-pass filters measurements and tracks slow clock drift.
-- Serial replay keeps the PLL rate estimate during pauses, unlocks after one heartbeat without data, and excludes the first second after samples resume from rate estimation.
 
 ## 0.5.0 — unreleased (2026-10-09)
 

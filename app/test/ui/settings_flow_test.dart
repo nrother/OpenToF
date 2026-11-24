@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opentof_app/ui/brand_logo.dart';
-import 'package:opentof_app/ui/main/status_indicators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'harness.dart';
@@ -101,101 +100,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('put the sensor to sleep: asks first, then waits for wake-up', (
-    tester,
-  ) async {
-    final h = await AppHarness.launch(tester);
-    await openSensor(h);
+  testWidgets(
+    'warns about a foreign protocol until disconnect or a valid event',
+    (tester) async {
+      final h = await AppHarness.launch(tester);
+      expect(find.text('Sensor uses a different protocol'), findsNothing);
 
-    await tester.tap(find.text('Put sensor to sleep'));
-    await settleRoute(h);
-    expect(find.text('Put sensor to sleep?'), findsOneWidget);
-    expect(find.textContaining('shake or hit it'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await settleRoute(h);
-    expect(h.mock.isAsleep, isFalse);
+      h.mock.emitForeignProtocol();
+      await h.advance(const Duration(milliseconds: 100));
+      expect(find.text('Sensor uses a different protocol'), findsOneWidget);
 
-    await tester.tap(find.text('Put sensor to sleep'));
-    await settleRoute(h);
-    await tester.tap(find.text('Put to sleep'));
-    await settleRoute(h);
-    expect(h.mock.isAsleep, isTrue);
-    expect(
-      find.text('The sensor is going to sleep. Shake or hit it to wake it up.'),
-      findsOneWidget,
-    );
-    // The row stays, disabled, and says how to wake the sensor.
-    expect(find.textContaining('The sensor is asleep.'), findsOneWidget);
-    expect(
-      tester
-          .widget<ListTile>(
-            find.widgetWithText(ListTile, 'Put sensor to sleep'),
-          )
-          .enabled,
-      isFalse,
-    );
+      // A supported event clears it.
+      h.mock.emitJump();
+      await h.advance(const Duration(milliseconds: 100));
+      expect(find.text('Sensor uses a different protocol'), findsNothing);
 
-    // Settings and the main screen show "asleep", not a lost connection.
-    await tester.pageBack();
-    await settleRoute(h);
-    expect(find.text('Sensor asleep'), findsOneWidget);
-    await tester.pageBack();
-    await settleRoute(h);
-    expect(find.text('Sensor asleep'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(ConnectionIndicator),
-        matching: find.text('Disconnected'),
-      ),
-      findsNothing,
-    );
-
-    // While the reconnect attempts run in the background, too.
-    await h.advance(const Duration(seconds: 30));
-    expect(find.text('Sensor asleep'), findsOneWidget);
-
-    h.mock.wake();
-    await h.advance(const Duration(milliseconds: 100));
-    expect(
-      find.descendant(
-        of: find.byType(ConnectionIndicator),
-        matching: find.text('Connected'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Sensor asleep'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('no sleep action for a sensor that cannot sleep', (tester) async {
-    final h = await AppHarness.launch(tester);
-    h.mock.supportsSleep = false;
-    h.mock.simulateDisconnect();
-    await h.advance(const Duration(milliseconds: 100));
-    h.mock.simulateReconnect();
-    await h.advance(const Duration(milliseconds: 100));
-    await openSensor(h);
-
-    expect(find.text('Battery'), findsOneWidget);
-    expect(find.text('Put sensor to sleep'), findsNothing);
-  });
-
-  testWidgets('sleep action is disabled while the sensor is disconnected', (
-    tester,
-  ) async {
-    final h = await AppHarness.launch(tester);
-    await openSensor(h);
-    h.mock.simulateDisconnect();
-    await h.advance(const Duration(milliseconds: 100));
-
-    expect(
-      find.text('Only possible while the sensor is connected.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Put sensor to sleep'));
-    await settleRoute(h);
-    expect(find.text('Put sensor to sleep?'), findsNothing);
-  });
+      // So does a disconnect; and the sensor page shows it, too.
+      h.mock.emitForeignProtocol();
+      await h.advance(const Duration(milliseconds: 100));
+      await openSensor(h);
+      expect(find.text('Sensor uses a different protocol'), findsOneWidget);
+      await tester.pageBack();
+      await settleRoute(h);
+      await tester.pageBack();
+      await settleRoute(h);
+      h.mock.simulateDisconnect();
+      await h.advance(const Duration(milliseconds: 100));
+      expect(find.text('Sensor uses a different protocol'), findsNothing);
+    },
+  );
 
   testWidgets('back twice exits, a single back only shows a hint', (
     tester,
@@ -406,7 +339,6 @@ void main() {
     final h = await AppHarness.launch(tester);
     await openSensor(h);
 
-    expect(find.text('Protocol version'), findsOneWidget);
     expect(find.text('Estimate (higher = more reliable)'), findsOneWidget);
     expect(find.text('• mock: simulated uncertainty'), findsOneWidget);
     expect(find.text('Push-off intensity'), findsOneWidget);

@@ -42,7 +42,7 @@ class _Record {
   DateTime? landedAt;
 }
 
-/// Combines takeoff/landing events (protocol 1) into [Jump]s.
+/// Combines takeoff/landing events (protocol 2) into [Jump]s.
 ///
 /// - A jump appears with its first landing, provided its takeoff is known.
 ///   Flight time = landing - takeoff of the same jump id; contact time =
@@ -53,8 +53,11 @@ class _Record {
 ///   the jump before it ever appears.
 /// - Missed jumps: a gap in the jump ids, or the previous jump id that never
 ///   became a complete jump, flags the next jump. An id far behind the last
-///   one is a sensor restart: new baseline, no warning. Call [reset] when the
-///   sensor's boot counter changes.
+///   one is a sensor restart: new baseline, no warning. So is an event whose
+///   device time is lower than the last one seen (retractions carry time 0
+///   and later estimates of an already known event are exempt); the first takeoff after such a restart has no previous
+///   landing, so its contact time is unknown. Call [reset] to forget
+///   everything by hand.
 class JumpAssembler {
   JumpAssembler({this.metadata = AlgorithmMetadata.none});
 
@@ -71,9 +74,27 @@ class JumpAssembler {
   /// before it counts as the previous one.
   final List<int> _voided = [];
   int? _lastId;
+
+  /// Device time of the last non-retracted event; null before the first one.
+  int? _lastTimeMs;
   int _nextSerial = 1;
 
   JumpUpdate? onEvent(JumpEvent e) {
+    if (e.stage != JumpEventStage.retracted && !_isRefinement(e)) {
+      final lastTime = _lastTimeMs;
+      // Modular distance back from the last time; a 32-bit wrap-around is
+      // forward in time, not a restart.
+      final back = lastTime == null
+          ? 0
+          : (lastTime - e.deviceTimeMs) & _timeMask;
+      if (back != 0 && back < 0x80000000) {
+        // The device clock went backwards: the sensor restarted.
+        _records.clear();
+        _voided.clear();
+        _lastId = null;
+      }
+      _lastTimeMs = e.deviceTimeMs;
+    }
     final r = _records[e.jumpId] ?? _newRecord(e.jumpId);
 
     if (e.stage == JumpEventStage.retracted) {
@@ -109,6 +130,13 @@ class JumpAssembler {
     r.serial = _nextSerial++;
     r.landedAt = r.landing!.receivedAt;
     return JumpAdded(_build(e.jumpId, r));
+  }
+
+  /// A later estimate of an event already seen (final after provisional): it
+  /// may sit a little before the newest event, which is no restart.
+  bool _isRefinement(JumpEvent e) {
+    final r = _records[e.jumpId];
+    return r != null && (e.isLanding ? r.landing : r.takeoff) != null;
   }
 
   _Record _newRecord(int id) {
@@ -174,5 +202,6 @@ class JumpAssembler {
     _records.clear();
     _voided.clear();
     _lastId = null;
+    _lastTimeMs = null;
   }
 }

@@ -163,6 +163,61 @@ void main() {
     expect(j.flightMs, 1000);
   });
 
+  test('a device time going backwards is a sensor restart', () {
+    final a = JumpAssembler();
+    a.onEvent(takeoff(1, 1000));
+    a.onEvent(landing(1, 2000));
+    a.onEvent(takeoff(2, 2200));
+    a.onEvent(landing(2, 3200));
+    // Same-looking next id, but the clock restarted: no gap warning and no
+    // contact time from the old clock.
+    final t = a.onEvent(takeoff(3, 400));
+    expect(t, isNull);
+    final j = added(a.onEvent(landing(3, 1400)));
+    expect(j.missedEvent, isFalse);
+    expect(j.contactMs, isNull);
+    expect(j.flightMs, 1000);
+    // Normal bookkeeping continues afterwards.
+    final next = added(
+      a.onEvent(takeoff(4, 1600)) ?? a.onEvent(landing(4, 2600)),
+    );
+    expect(next.contactMs, 200);
+  });
+
+  test('a restart with a gap-free id does not flag the first jump', () {
+    final a = JumpAssembler();
+    a.onEvent(takeoff(5, 9000));
+    a.onEvent(landing(5, 10000));
+    a.onEvent(takeoff(6, 100)); // id +1 but clock back
+    final j = added(a.onEvent(landing(6, 1100)));
+    expect(j.missedEvent, isFalse);
+    expect(j.contactMs, isNull);
+  });
+
+  test('retractions (device time 0) do not count as a restart', () {
+    final a = JumpAssembler();
+    a.onEvent(takeoff(1, 1000));
+    a.onEvent(landing(1, 2000));
+    a.onEvent(takeoff(2, 2200));
+    final fake = added(
+      a.onEvent(landing(2, 2900, stage: JumpEventStage.provisional)),
+    );
+    expect(
+      (a.onEvent(retracted(2, JumpEventType.landing))! as JumpRemoved).serial,
+      fake.serial,
+    );
+    final real = added(a.onEvent(landing(2, 3300)));
+    expect(real.contactMs, 200); // jump 1's landing is still known
+    expect(real.missedEvent, isFalse);
+  });
+
+  test('a provisional-to-final refinement of the same time is no restart', () {
+    final a = JumpAssembler();
+    a.onEvent(takeoff(1, 1000));
+    added(a.onEvent(landing(1, 2000, stage: JumpEventStage.provisional)));
+    changed(a.onEvent(landing(1, 2000)));
+  });
+
   test('jump ids and device times wrap around', () {
     final a = JumpAssembler();
     a.onEvent(takeoff(0xFFFF, 0xFFFFFF00));

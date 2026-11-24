@@ -10,7 +10,7 @@ firmware/OpenToF_Firmware/      Arduino sketch (XIAO MG24 Sense)
   OpenToF_Firmware.ino          setup()/loop() only; algorithm selection block at the top
   config/                       FirmwareConfig.h (modes, version, timing, pins), BleUuids.h (protocol)
   algorithms/                   one header per detector (+ BatteryCurve.h)
-  core/                         IMU, demo source, event rules, BLE service, battery, name, boot counter, sleep
+  core/                         IMU, demo source, event rules, BLE service, battery, name, sleep
 
 app/lib/                        Flutter app (Riverpod 3)
   main.dart, app.dart           ProviderScope + MaterialApp (home = main screen)
@@ -42,9 +42,12 @@ Data flow: IMU → detector (`algorithms/`) → `JumpEventPublisher` (ids, stage
 
 ## Open: needs real hardware
 
-- [ ] Verify protocol 1 end-to-end over real BLE (firmware `DEMO_MODE 1` and a real detector): two-stage
+- [ ] **`TofNetJumpDetector` is too slow for the MG24 (39 MHz)** (measured 2026-11-24): ~2.0 ms per sample of a
+      2.4 ms budget (~83 % CPU), of which ~3.65 ms per 200 Hz network step and ~0.44 ms per sample of `double`
+      feature/decoder math. The FIFO reached 1944/2048 words, so it will overflow under BLE load. The research repo's
+      exporter is being optimised (weights in RAM, contiguous layout, float feature path); target ≤ ~30 % CPU.
+- [ ] Verify protocol 2 end-to-end over real BLE (firmware `DEMO_MODE 1` and a real detector): two-stage
       replacement, retraction, metadata reads (including long reads > 22 bytes).
-- [ ] Verify the sleep command and "Sensor asleep" with a real sensor and phone.
 - [ ] Measure the sleep current; consider checking the IMU before `main()` to shorten the ~0.9 s boot per 3 s wake-up
       check (I2C there currently hangs, see `firmware/deep_sleep_test/`).
 - [ ] Read the Device Information fields with a scanner app (e.g. nRF Connect).
@@ -61,7 +64,7 @@ Data flow: IMU → detector (`algorithms/`) → `JumpEventPublisher` (ids, stage
 
 - [ ] Real GATT UUIDs once the protocol is frozen (app and firmware together).
 - [ ] The app doesn't check the 20-byte limit when renaming the sensor; the firmware silently undoes too-long names.
-- [ ] Reconnecting to a sleeping sensor costs phone battery (10 s direct connect every 10 s); try `autoConnect` or a
+- [ ] Reconnecting to a sleeping sensor costs phone battery (repeated direct connects); try `autoConnect` or a
       back-off.
 - [ ] Battery history is in memory only; persist it if restarts should keep the estimate.
 - [ ] The algorithm headers refer to a research repository (`src/opentof_research/…`, `experiments/…`) that is not

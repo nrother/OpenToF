@@ -1,4 +1,4 @@
-# OpenToF BLE protocol (version 1)
+# OpenToF BLE protocol (version 2)
 - All multi-byte values are **little-endian**.
 - The 128-bit UUIDs spell `open-ToF` and differ only in the fourth group (`6f70656e-546f-4600-XXXX-000000000000`).
 - The sensor advertises the Jump service; the app scans for that UUID.

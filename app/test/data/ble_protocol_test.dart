@@ -7,7 +7,7 @@ final t = DateTime(2026, 1, 1);
 void main() {
   test('event parses the fixed little-endian layout and the extras', () {
     final e = BleProtocol.parseEvent([
-      1, // proto
+      2, // proto
       0x34, 0x12, // jump_id 0x1234
       0x03, // landing, final
       0xD2, 0x04, 0x00, 0x00, // 1234 ms
@@ -26,11 +26,11 @@ void main() {
   });
 
   test('kind byte: takeoff provisional and retracted; 255 = no confidence', () {
-    final p = BleProtocol.parseEvent([1, 1, 0, 0x00, 0, 0, 0, 0, 255, 0], t)!;
+    final p = BleProtocol.parseEvent([2, 1, 0, 0x00, 0, 0, 0, 0, 255, 0], t)!;
     expect(p.type, JumpEventType.takeoff);
     expect(p.stage, JumpEventStage.provisional);
     expect(p.confidence, isNull);
-    final r = BleProtocol.parseEvent([1, 1, 0, 0x05, 0, 0, 0, 0, 255, 0], t)!;
+    final r = BleProtocol.parseEvent([2, 1, 0, 0x05, 0, 0, 0, 0, 255, 0], t)!;
     expect(r.type, JumpEventType.landing);
     expect(r.stage, JumpEventStage.retracted);
   });
@@ -56,20 +56,24 @@ void main() {
   });
 
   test('malformed events are rejected', () {
-    List<int> ok() => [1, 1, 0, 0, 0, 0, 0, 0, 255, 0];
+    List<int> ok() => [2, 1, 0, 0, 0, 0, 0, 0, 255, 0];
     expect(BleProtocol.parseEvent(ok().sublist(0, 9), t), isNull);
     expect(BleProtocol.parseEvent([...ok(), ...List.filled(11, 0)], t), isNull);
-    expect(BleProtocol.parseEvent([2, ...ok().sublist(1)], t), isNull); // proto
+    expect(
+      BleProtocol.parseEvent([1, ...ok().sublist(1)], t),
+      isNull,
+    ); // old proto
     final badStage = ok()..[3] = 0x06; // stage 3
     expect(BleProtocol.parseEvent(badStage, t), isNull);
   });
 
-  test('info: proto, boot counter, device time', () {
-    final i = BleProtocol.parseInfo([1, 0x02, 0x01, 0x10, 0x27, 0, 0])!;
-    expect(i.protocol, 1);
-    expect(i.bootCount, 0x0102);
-    expect(i.deviceTimeMs, 10000);
-    expect(BleProtocol.parseInfo([1, 2, 3]), isNull);
+  test('foreignProtocol names a rejected proto byte, not malformed data', () {
+    expect(BleProtocol.foreignProtocol([1, 1, 0, 0, 0, 0, 0, 0, 255, 0]), 1);
+    expect(
+      BleProtocol.foreignProtocol([2, 1, 0, 0, 0, 0, 0, 0, 255, 0]),
+      isNull,
+    );
+    expect(BleProtocol.foreignProtocol([]), isNull);
   });
 
   test('battery level 0-100 only', () {
@@ -101,13 +105,5 @@ void main() {
     expect(BleProtocol.hardwareRevisionCharacteristic, '2a27');
     expect(BleProtocol.firmwareRevisionCharacteristic, '2a26');
     expect(BleProtocol.softwareRevisionCharacteristic, '2a28');
-  });
-
-  test('command characteristic: UUID 000a, sleep is the single byte 0x01', () {
-    expect(
-      BleProtocol.commandCharacteristic,
-      '6f70656e-546f-4600-000a-000000000000',
-    );
-    expect(BleProtocol.encodeCommand(SensorCommand.sleep), [0x01]);
   });
 }

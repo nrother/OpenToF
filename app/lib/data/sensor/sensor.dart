@@ -62,6 +62,10 @@ abstract class Sensor {
   /// Battery level in percent (0-100).
   Stream<int> get batteryLevel;
 
+  /// Emits the protocol byte of every event the sensor sent with a protocol
+  /// version this app does not understand (such events are dropped).
+  Stream<int> get unsupportedProtocol;
+
   Stream<SensorConnectionState> get connectionState;
   SensorConnectionState get currentConnectionState;
 
@@ -81,24 +85,10 @@ abstract class Sensor {
   /// unavailable fields come back null.
   Future<DeviceInfo> readDeviceInfo();
 
-  /// Protocol version, boot counter and current device time; null if
-  /// unavailable. Never throws.
-  Future<SensorInfo?> readSensorInfo();
-
   /// What the sensor's algorithm puts into its events (custom fields, reason
   /// names, confidence kind). Never throws; falls back to
   /// [AlgorithmMetadata.none].
   Future<AlgorithmMetadata> readAlgorithmMetadata();
-
-  /// Whether the connected sensor can be sent to deep sleep with [sleep]
-  /// (older firmware cannot). Only meaningful while connected.
-  bool get supportsSleep;
-
-  /// Sends the sensor to deep sleep. It drops the connection and stays
-  /// invisible until it is shaken or hit; the automatic reconnect of [connect]
-  /// then picks it up again. Throws if the sensor is not connected or does not
-  /// support it.
-  Future<void> sleep();
 
   /// Releases all resources. The sensor must not be used afterwards.
   Future<void> dispose();

@@ -18,7 +18,7 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
 - Debug builds contain a **simulated sensor** (`MockSensor`) behind the same interface as the real one, so the app
   can be developed and tested without hardware.
 
-## Sensor ↔ app protocol (protocol 1, 2026-09-26; sleep command 2026-10-09)
+## Sensor ↔ app protocol (protocol 1, 2026-09-26; protocol 2, 2026-11-24)
 
 - **The sensor sends events with its own timestamps, not durations.** The app computes flight time, time on bed,
   totals and height. Why: Bluetooth delays then never affect the measured times, and the app can recompute
@@ -31,9 +31,12 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
 - **No replay buffer**: the connection is assumed to stay up; events while disconnected are lost and shown as
   missed. Dropped from the algorithm team's proposal as well: a live-state characteristic (provisional events cover
   it), device health, a debug stream. Possible later: landing position / landing type as custom fields.
-- **Boot counter** instead of a clock sync, so the app notices a restarted device clock.
-- **Sleep command** as a new optional characteristic within protocol 1; its presence is the feature flag, so no
-  protocol version bump was needed.
+- **Protocol 2 drops the Info characteristic (boot counter, device time) and the sleep command** (2026-11-24). Why:
+  removed in the firmware cleanup to keep the firmware small and simple; the features weren't worth their
+  complexity. Counted as a protocol change, so app and firmware must match.
+- **Restart detection without a boot counter** (2026-11-24): the app treats a jump id far behind the last one
+  (≥ 0x8000 back, modulo 2¹⁶) or an event time lower than the last one (retractions excluded) as a sensor restart
+  and forgets its jump bookkeeping. The first takeoff after that has no time on bed.
 - **Scan by Jump service UUID**, not by name (names can be changed).
 - **BLE library: flutter_blue_plus with `License.nonprofit`.** The product owner confirmed OpenToF qualifies
   (2026-09-21). If that ever changes (e.g. commercial distribution), change the license in `ble_sensor.dart` or
@@ -86,8 +89,8 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
   Settings.
 - Settings: pair/scan, rename and unpair the sensor, routine (timeout 1–30 s, jumps per routine), sounds, chart
   window, jump display, theme (System/Light/Dark), LED signals, version.
-- **Sensor page** (tap the paired sensor, 2026-09-26): battery and time remaining, device info, protocol version and
-  boot count, the detection algorithm's name and declared values, and "Put sensor to sleep".
+- **Sensor page** (tap the paired sensor, 2026-09-26): battery and time remaining, device info, protocol version,
+  and the detection algorithm's name and declared values.
 - **Version warning** in Settings and on the sensor page when app and firmware MAJOR.MINOR differ; none while the
   firmware version is unknown.
 - **Battery time remaining** is estimated on the phone from recent readings (least-squares slope; needs ≥ 5 min and
@@ -97,9 +100,6 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
   (`firmware/README.md`, "LED signals").
 - **In-app changelog** (2026-10-09): *Settings → Version* shows the root `Changelog.md` in two tabs, App and Sensor
   firmware. The file is the single source; the app bundles a copy (see "Releasing" in the root README).
-- **While the sensor sleeps on the app's command** the status reads "Sensor asleep" and the app retries every 10 s
-  instead of 2 s. This state is only known in memory and only after the app's own command.
-
 ## Android and iOS
 
 - Android: a **foreground service** keeps the BLE connection alive while a sensor is paired. Because of it there are
@@ -145,7 +145,7 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
 - **Deep sleep** (2026-10-09): after 1 minute (`SLEEP_AFTER_IDLE_MS`; 5 minutes felt too long) without a connected app
   and without a jump, the sensor sleeps (EM4). It never sleeps by itself while an app is connected. The board doesn't
   wire the IMU interrupt pins, so a timer wakes the MCU every 3 s to check the IMU's wake-up flag. Waking up for real
-  is a normal start (boot counter +1, app reconnects); the 3 s checks don't count as starts. Off in `DEMO_MODE`.
+  is a normal start (app reconnects); the 3 s checks don't count as starts. Off in `DEMO_MODE`.
 - **LED signals** (2026-10-09): the orange LED blinks slowly while waiting for the app, is on while connected, and
   has short patterns for going to sleep, woken up and start-up failure. Full table: `firmware/README.md`.
 - Unverified engineering choices: gyro range ±500 dps, connection interval 7.5–15 ms, advertising interval 100 ms.
@@ -157,6 +157,6 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
   map known `id`s).
 - Very long contact times (standing still, then bouncing) are reported as they are; should there be a cap?
 - Whether the hardware revision string (`0.1`) is right for the real board.
-- Whether a sleeping sensor should be found with `autoConnect` or a back-off instead of a 10 s direct connect every
-  10 s (costs some phone battery; needs testing on hardware).
+- Whether a sleeping sensor should be found with `autoConnect` or a back-off instead of repeated direct connects
+  (costs some phone battery; needs testing on hardware).
 - Min OS versions (Android 10 / iOS 15) against the devices gyms actually use.

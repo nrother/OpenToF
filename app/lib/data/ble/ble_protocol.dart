@@ -9,44 +9,31 @@ import '../../domain/sensor_events.dart';
 /// PLACEHOLDER UUIDs — the real ones are an open item pending firmware
 /// agreement (docs/DECISIONS.md). All multi-byte values are little-endian.
 ///
-/// Jump service characteristics (protocol 1):
+/// Jump service characteristics (protocol 2):
 ///  - Event            (Notify): proto u8, jump_id u16, kind u8, t_ms u32,
 ///                     confidence u8, reasons u8, then up to 10 bytes of
 ///                     custom fields. kind bit 0 = landing, bits 1-2 = stage
 ///                     (0 provisional, 1 final, 2 retracted).
-///  - Info             (Read): proto u8, boot_count u16, device_time_ms u32
 ///  - Fields           (Read): JSON array of custom field descriptions
 ///  - Reasons          (Read): JSON array naming the reason bits
 ///  - Confidence kind  (Read): "none" | "heuristic" | "calibrated"
 ///  - Name             (Read/Write): UTF-8 string
-///  - Command          (Write with response): command u8, see
-///                     [SensorCommand]. Only on firmware with deep sleep;
-///                     its presence is how the app detects that feature.
-/// What the app can tell the sensor to do through the Command
-/// characteristic.
-enum SensorCommand {
-  /// Go to deep sleep now: the sensor disconnects, blinks and sleeps until it
-  /// is moved.
-  sleep,
-}
 
 class BleProtocol {
   BleProtocol._();
 
   /// Event layout version this app understands.
-  static const protocolVersion = 1;
+  static const protocolVersion = 2;
 
   // Placeholder 128-bit UUIDs ("openToF" prefix + index). 0002/0003 were the
   // protocol-0 Landing/Takeoff characteristics and are not reused.
   static const jumpService = '6f70656e-546f-4600-0001-000000000000';
   static const nameCharacteristic = '6f70656e-546f-4600-0004-000000000000';
   static const eventCharacteristic = '6f70656e-546f-4600-0005-000000000000';
-  static const infoCharacteristic = '6f70656e-546f-4600-0006-000000000000';
   static const fieldsCharacteristic = '6f70656e-546f-4600-0007-000000000000';
   static const reasonsCharacteristic = '6f70656e-546f-4600-0008-000000000000';
   static const confidenceKindCharacteristic =
       '6f70656e-546f-4600-0009-000000000000';
-  static const commandCharacteristic = '6f70656e-546f-4600-000a-000000000000';
 
   // Standard Bluetooth SIG Battery Service / Battery Level.
   static const batteryService = '180f';
@@ -66,8 +53,12 @@ class BleProtocol {
 
   static const eventFixedLength = 10;
   static const eventExtrasMax = 10;
-  static const infoLength = 7;
   static const _noConfidence = 255;
+
+  /// The protocol byte of an event payload that [parseEvent] rejects only
+  /// because it is not [protocolVersion]; null otherwise.
+  static int? foreignProtocol(List<int> data) =>
+      data.isNotEmpty && data[0] != protocolVersion ? data[0] : null;
 
   /// Returns null for malformed payloads, unknown protocol versions and
   /// unknown stages.
@@ -115,17 +106,6 @@ class BleProtocol {
     return b.buffer.asUint8List();
   }
 
-  /// Returns null for malformed payloads.
-  static SensorInfo? parseInfo(List<int> data) {
-    if (data.length < infoLength) return null;
-    final b = ByteData.sublistView(Uint8List.fromList(data));
-    return SensorInfo(
-      protocol: b.getUint8(0),
-      bootCount: b.getUint16(1, Endian.little),
-      deviceTimeMs: b.getUint32(3, Endian.little),
-    );
-  }
-
   /// Battery level 0-100, or null if malformed / out of range.
   static int? parseBattery(List<int> data) {
     if (data.isEmpty) return null;
@@ -143,11 +123,4 @@ class BleProtocol {
   }
 
   static List<int> encodeName(String name) => utf8.encode(name);
-
-  /// The one-byte payload written to the Command characteristic.
-  static List<int> encodeCommand(SensorCommand command) => [
-    switch (command) {
-      SensorCommand.sleep => 0x01,
-    },
-  ];
 }

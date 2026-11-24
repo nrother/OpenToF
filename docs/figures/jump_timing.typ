@@ -79,7 +79,7 @@
   span(l1, t2, -1.3, muted, [ToB#sub[N+1]], weight: "regular")
   span(l0, l1, -2.45, tot, [Total#sub[N] = ToB#sub[N] + ToF#sub[N]])
 
-  // ---- what the sensor reports (BLE events, protocol 1) ------------------
+  // ---- what the sensor reports (BLE events, protocol 2) ------------------
   let lane = -3.55
   line((0, lane), (x-end, lane), stroke: 0.6pt + muted)
   content((0, lane + 0.12), anchor: "south-west", text(size: 8pt, fill: muted)[sensor reports (time →)])

@@ -23,8 +23,11 @@
 // #include "algorithms/AzPipelineBufferedJumpDetector.h"
 // typedef AzPipelineBufferedJumpDetector ActiveJumpDetector;
 
-#include "algorithms/BedCycleJumpDetector.h"
-typedef BedCycleJumpDetector ActiveJumpDetector;
+// #include "algorithms/BedCycleJumpDetector.h"
+// typedef BedCycleJumpDetector ActiveJumpDetector;
+
+#include "algorithms/TofNetJumpDetector.h"
+typedef TofNetJumpDetector ActiveJumpDetector;
 
 
 #include "config/FirmwareConfig.h"

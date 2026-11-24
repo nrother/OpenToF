@@ -3,11 +3,11 @@
 #pragma once
 
 // ============================================================================
-// OpenToF custom protocol, version 1 (PROTOCOL_VERSION)
+// OpenToF custom protocol, version 2 (PROTOCOL_VERSION)
 // ============================================================================
 // see ../docs/PROTOCOL.md for details
 
-#define PROTOCOL_VERSION 1
+#define PROTOCOL_VERSION 2
 
 #define UUID_JUMP_SERVICE "6f70656e-546f-4600-0001-000000000000"
 #define UUID_NAME "6f70656e-546f-4600-0004-000000000000"

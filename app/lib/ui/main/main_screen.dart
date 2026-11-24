@@ -6,6 +6,7 @@ import '../../domain/chart_event.dart';
 import '../../domain/jump.dart';
 import '../../domain/routine.dart';
 import '../../l10n/app_localizations.dart';
+import '../settings/sensor_screen.dart' show ProtocolMismatchWarning;
 import '../../state/providers.dart';
 import '../brand_logo.dart';
 import '../format.dart';
@@ -22,7 +23,6 @@ class MainScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
-    final asleep = ref.watch(sessionProvider.select((s) => s.asleep));
     final battery = ref.watch(sessionProvider.select((s) => s.batteryLevel));
     final routine = ref.watch(sessionProvider.select((s) => s.routine));
     final hasHistory = ref.watch(
@@ -58,11 +58,7 @@ class MainScreen extends ConsumerWidget {
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ConnectionIndicator(
-              connection: connection,
-              paired: paired,
-              asleep: asleep,
-            ),
+            child: ConnectionIndicator(connection: connection, paired: paired),
           ),
           BatteryIndicator(level: battery),
           IconButton(
@@ -80,6 +76,7 @@ class MainScreen extends ConsumerWidget {
               _PairSensorCard(onTap: () => _openSettings(context)),
               const SizedBox(height: 12),
             ],
+            const ProtocolMismatchWarning(margin: EdgeInsets.only(bottom: 12)),
             const _LastJumpCard(),
             const SizedBox(height: 12),
             const _RoutineActions(),

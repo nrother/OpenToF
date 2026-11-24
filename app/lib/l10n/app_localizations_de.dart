@@ -375,6 +375,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get protocolMismatchTitle => 'Sensor nutzt ein anderes Protokoll';
+
+  @override
+  String get protocolMismatchBody =>
+      'Seine Sprünge werden ignoriert. Bitte die Sensor-Firmware oder diese App aktualisieren.';
+
+  @override
   String get versionMismatchTitle => 'Sensor-Firmware passt nicht zur App';
 
   @override
@@ -387,12 +394,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get algorithmSection => 'Erkennungsalgorithmus';
-
-  @override
-  String get protocolVersionLabel => 'Protokollversion';
-
-  @override
-  String get bootCountLabel => 'Sensor-Starts';
 
   @override
   String get confidenceKindLabel => 'Konfidenz';
@@ -631,44 +632,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Signale stammen aus dem Datenblatt des Ladechips. An unseren eigenen Sensoren wurde bisher nur das Blitzen beim Laden beobachtet, die beiden anderen können also leicht abweichen. Die App kann nicht anzeigen, ob der Sensor lädt, weil die Sensor-Software dieses Licht nicht auslesen kann.';
 
   @override
-  String get connectionAsleep => 'Sensor schläft';
-
-  @override
-  String get sleepSensor => 'Sensor schlafen legen';
-
-  @override
-  String get sleepSensorHelp =>
-      'Spart Akku, bis du den Sensor wieder brauchst.';
-
-  @override
-  String get sleepSensorNotConnected =>
-      'Nur möglich, solange der Sensor verbunden ist.';
-
-  @override
-  String get sleepSensorAsleep =>
-      'Der Sensor schläft. Zum Aufwecken schütteln oder anstoßen; die App verbindet sich dann von selbst.';
-
-  @override
-  String get sleepConfirmTitle => 'Sensor schlafen legen?';
-
-  @override
-  String get sleepConfirmBody =>
-      'Der Sensor trennt die Verbindung, blinkt 6-mal und schläft, bis er bewegt wird.\n\nZum Aufwecken schütteln oder anstoßen: Er reagiert innerhalb von etwa 4 Sekunden, und die App verbindet sich von selbst wieder.';
-
-  @override
-  String get sleepAction => 'Schlafen legen';
-
-  @override
-  String get sleepStarted =>
-      'Der Sensor schläft ein. Zum Aufwecken schütteln oder anstoßen.';
-
-  @override
-  String sleepFailed(String message) {
-    return 'Der Sensor konnte nicht schlafen gelegt werden: $message';
-  }
-
-  @override
-  String get simWake => 'Aufwecken simulieren';
+  String get simRestart => 'Sensor-Neustart simulieren';
 
   @override
   String get changelogTileHelp => 'Änderungen anzeigen';

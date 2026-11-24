@@ -378,7 +378,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _connectionText(AppLocalizations l, SessionState session) =>
       switch (session.connection) {
         SensorConnectionState.connected => l.connectionConnected,
-        _ when session.asleep => l.connectionAsleep,
         SensorConnectionState.connecting => l.connectionConnecting,
         SensorConnectionState.disconnected => l.connectionDisconnected,
       };
@@ -538,7 +537,10 @@ class _SimulatorControls extends ConsumerWidget {
             onPressed: mock.simulateReconnect,
             child: Text(l.simReconnect),
           ),
-          FilledButton.tonal(onPressed: mock.wake, child: Text(l.simWake)),
+          FilledButton.tonal(
+            onPressed: mock.restart,
+            child: Text(l.simRestart),
+          ),
         ],
       ),
     );
