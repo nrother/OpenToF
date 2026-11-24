@@ -26,6 +26,14 @@ app 0.6.0 also works with firmware 0.5.0 (just without the sleep button), but it
   app and the sensor firmware.
 - **LED help page:** now also explains the red charge LED.
 
+## 0.6.1 — unreleased (2026-11-24)
+
+**Firmware 0.6.1** (app remains 0.6.0).
+
+### Sensor firmware
+- IMU sample timestamps now follow a software PLL that acquires the actual sample rate over its first 5-second sample window, then low-pass filters measurements and tracks slow clock drift.
+- Serial replay keeps the PLL rate estimate during pauses, unlocks after one heartbeat without data, and excludes the first second after samples resume from rate estimation.
+
 ## 0.5.0 — unreleased (2026-10-09)
 
 **App 0.5.0** (build 4) and **firmware 0.5.0**. The BLE protocol is unchanged (still protocol 1), but update

@@ -4,25 +4,24 @@
 #include <Arduino.h>
 
 #include "ImuSampleSource.h"
-#include "Micros64.h"
 
 class SerialReplaySource : public ImuSampleSource {
  public:
-  explicit SerialReplaySource(JumpDetector& detector) : ImuSampleSource(detector) {}
+  explicit SerialReplaySource(JumpDetector& detector)
+      : ImuSampleSource(detector) {}
 
   bool begin() {
-    _lastReceivedUs = 0;
-    _sampleTimeUs = 0;
-    _hasReceivedSample = false;
+    resetSampleClock();
+    _state = State::idle;
+    _resumeAtMs = 0;
+    _lastSampleMs = 0;
     beginSamples();
     return true;
   }
 
   bool poll(Transition& out) override {
     if (nextTransition(out)) return true;
-#if DEBUG_SERIAL
     heartbeat("Serial replay", "bytes waiting = ", Serial.available());
-#endif
 
     while (Serial.available() >= static_cast<int>(sizeof(RawImuSample))) {
       RawImuSample sample;
@@ -31,25 +30,51 @@ class SerialReplaySource : public ImuSampleSource {
         sampleBytes[i] = static_cast<uint8_t>(Serial.read());
       }
 
-      processSampleAtArrival(sample);
+      processSample(sample, nextSampleTimeUs(), samplePeriodSeconds());
       if (nextTransition(out)) return true;
     }
 
     return false;
   }
 
- private:
-  uint64_t _lastReceivedUs = 0;
-  uint64_t _sampleTimeUs = 0;
-  bool _hasReceivedSample = false;
+ protected:
+  void onSampleReceived(uint32_t now) override {
+    checkForGap(now);
+    if (_state == State::idle) {
+      _state = State::warmup;
+      _resumeAtMs = now;
+    }
+    _lastSampleMs = now;
+  }
 
-  void processSampleAtArrival(const RawImuSample& sample) {
-    const uint64_t receivedUs = micros64();
-    const uint64_t elapsedUs =
-        _hasReceivedSample ? receivedUs - _lastReceivedUs : 0;
-    _lastReceivedUs = receivedUs;
-    _hasReceivedSample = true;
-    _sampleTimeUs += elapsedUs;
-    processSample(sample, _sampleTimeUs, elapsedUs / 1000000.0f);
+  bool shouldMeasureSampleRate(uint32_t now) override {
+    if (checkForGap(now)) return false;
+
+    if (_state == State::warmup) {
+      if (static_cast<uint32_t>(now - _resumeAtMs) >= 1000UL) {
+        _state = State::tracking;
+      }
+      return false;
+    }
+    return _state == State::tracking;
+  }
+
+ private:
+  enum class State { idle, warmup, tracking };
+
+  State _state = State::idle;
+  uint32_t _resumeAtMs = 0;
+  uint32_t _lastSampleMs = 0;
+
+  bool checkForGap(uint32_t now) {
+    if (_state == State::idle ||
+        static_cast<uint32_t>(now - _lastSampleMs) < IMU_HEARTBEAT_MS) {
+      return false;
+    }
+
+    unlockSampleRate();
+    resetRateAccumulation();
+    _state = State::idle;
+    return true;
   }
 };

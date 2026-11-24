@@ -8,8 +8,6 @@
 #include "../config/FirmwareConfig.h"
 #include "ImuSampleSource.h"
 
-#define IMU_SAMPLE_RATE_HZ 416
-
 class ImuSource : public ImuSampleSource {
  public:
   explicit ImuSource(JumpDetector& detector)
@@ -61,8 +59,7 @@ class ImuSource : public ImuSampleSource {
     // clear the FIFO, we are ready to go
     _imu.fifoClear();
 
-    _sampleCount = 0;
-    _lastSampleUs = 0;
+    resetSampleClock();
     beginSamples();
     return true;
   }
@@ -118,10 +115,8 @@ class ImuSource : public ImuSampleSource {
         noteReadFailure();
         return false;
       }
-      const float dt = 1.0f / IMU_SAMPLE_RATE_HZ;
-      _sampleCount++;
-      _lastSampleUs = (_sampleCount * 1000000ULL) / IMU_SAMPLE_RATE_HZ;
-      processSample(sample, _lastSampleUs, dt);
+      const float dt = samplePeriodSeconds();
+      processSample(sample, nextSampleTimeUs(), dt);
 
       words -= IMU_WORDS_PER_SAMPLE;
     }
@@ -130,8 +125,6 @@ class ImuSource : public ImuSampleSource {
 
  private:
   LSM6DS3 _imu;
-  uint64_t _sampleCount = 0;
-  uint64_t _lastSampleUs = 0;
 
   bool writeReg(uint8_t offset, uint8_t value) { return _imu.writeRegister(offset, value) == IMU_SUCCESS; }
 

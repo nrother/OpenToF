@@ -15,8 +15,6 @@ For the reasoning behind individual choices see `docs/DECISIONS.md`; this file o
 app 0.6.0 also works with firmware 0.5.0 (just without the sleep button), but it shows the version warning.
 
 ### Sensor firmware
-- **Sleep on command:** the app can now send the sensor to deep sleep right away. It blinks 6 times and
-  sleeps exactly as after the idle timeout; shake or hit it to wake it up.
 - `firmware/README.md` now also explains the red charge LED (charging, full, off).
 
 ### App
@@ -24,12 +22,17 @@ app 0.6.0 also works with firmware 0.5.0 (just without the sleep button), but it
   first landing after Start is jump 1. The jump that had already landed no longer counts, and pressing Start
   no longer beeps. The inactivity timeout now runs from the moment you press Start. A 1-jump routine ends on
   the first landing after Start.
-- **Put sensor to sleep:** a button on the sensor page (Battery section) sends the sensor to sleep, with a
-  confirmation that explains how to wake it. While it sleeps the status reads "Sensor asleep" and the app
-  looks for it less often. The button is hidden for firmware that can't do this.
 - **Changelog in the app:** Settings → Version shows what changed in each release, with separate tabs for the
   app and the sensor firmware.
 - **LED help page:** now also explains the red charge LED.
+
+## 0.6.1 — unreleased (2026-11-24)
+
+**Firmware 0.6.1** (app remains 0.6.0).
+
+### Sensor firmware
+- IMU sample timestamps now follow a software PLL that acquires the actual sample rate over its first 5-second sample window, then low-pass filters measurements and tracks slow clock drift.
+- Serial replay keeps the PLL rate estimate during pauses, unlocks after one heartbeat without data, and excludes the first second after samples resume from rate estimation.
 
 ## 0.5.0 — unreleased (2026-10-09)
 

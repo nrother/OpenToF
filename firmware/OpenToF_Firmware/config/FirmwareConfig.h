@@ -9,7 +9,7 @@
 // 1 = simulate jumps instead
 #define DEMO_MODE 0
 // 1 = read datalogger binary packets from Serial instead of the onboard IMU.
-#define SERIAL_REPLAY_MODE 1
+#define SERIAL_REPLAY_MODE 0
 
 #if DEMO_MODE && SERIAL_REPLAY_MODE
 #error "DEMO_MODE and SERIAL_REPLAY_MODE cannot both be enabled"
@@ -20,6 +20,13 @@
 
 // While DEBUG_SERIAL is on, print one summary line this often with the measured sample rate.
 #define IMU_HEARTBEAT_MS 1000UL
+// PLL measurement window for acquisition and subsequent updates.
+#define IMU_RATE_INTERVAL_MS 5000UL
+// Maximum PLL frequency adjustment.
+#define IMU_RATE_MAX_DRIFT_HZ_PER_MINUTE 1.0f
+// First-order low-pass time constant for rate measurements after acquisition.
+#define IMU_RATE_FILTER_TIME_CONSTANT_MS 100000UL
+#define IMU_SAMPLE_RATE_HZ 416
 
 // ============================================================================
 // Deep sleep. Disabled in DEMO_MODE and SERIAL_REPLAY_MODE.
@@ -48,7 +55,7 @@
 // Every string must be at most DIS_STRING_MAX (32) bytes.
 // ============================================================================
 
-#define FIRMWARE_VERSION "0.6.0"    // Firmware Revision String; bump on every release
+#define FIRMWARE_VERSION "0.6.1"    // Firmware Revision String; bump on every release
 #define HARDWARE_REVISION "0.1"     // Hardware Revision String; change with the PCB/board
 #define MANUFACTURER_NAME "OpenToF"
 #define MODEL_NUMBER "OpenToF Sensor"

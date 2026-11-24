@@ -63,9 +63,13 @@ cat recording.csv | uv run software/replay_data.py --port /dev/ttyACM0
 ```
 
 The script accepts CSV output from `software/dump_data.py`. It converts the recorded physical values back to int16 IMU counts and sends one 12-byte sample at a time.
-The sender paces samples at 416 Hz by default; use `--rate` to change this.
-The firmware timestamps samples from their actual arrival intervals and its heartbeat reports the measured rate.
-Its normal active jump detector processes the replay. The serial baud rate is 115200.
+The sender paces samples at 416 Hz by default; use `--rate` to change this. The firmware timestamps samples from a
+shared PLL initialized at 416 Hz. It acquires and updates the rate from sample counts over a 5-second window using
+microsecond timing, then low-pass filters measurements and limits drift adjustments to 1 Hz per minute.
+`IMU_RATE_INTERVAL_MS` controls the measurement window.
+For serial replay, the PLL unlocks after one heartbeat without data, retaining its last rate estimate; the first
+second after data resumes is excluded from rate estimation before it reacquires. Its normal active jump detector
+processes the replay. The serial baud rate is 115200.
 
 ## Detection algorithms
 
