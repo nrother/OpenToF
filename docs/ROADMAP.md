@@ -42,10 +42,6 @@ Data flow: IMU → detector (`algorithms/`) → `JumpEventPublisher` (ids, stage
 
 ## Open: needs real hardware
 
-- [ ] **`TofNetJumpDetector` is too slow for the MG24 (39 MHz)** (measured 2026-11-24): ~2.0 ms per sample of a
-      2.4 ms budget (~83 % CPU), of which ~3.65 ms per 200 Hz network step and ~0.44 ms per sample of `double`
-      feature/decoder math. The FIFO reached 1944/2048 words, so it will overflow under BLE load. The research repo's
-      exporter is being optimised (weights in RAM, contiguous layout, float feature path); target ≤ ~30 % CPU.
 - [ ] Verify protocol 2 end-to-end over real BLE (firmware `DEMO_MODE 1` and a real detector): two-stage
       replacement, retraction, metadata reads (including long reads > 22 bytes).
 - [ ] Measure the sleep current; consider checking the IMU before `main()` to shorten the ~0.9 s boot per 3 s wake-up

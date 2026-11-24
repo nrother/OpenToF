@@ -9,6 +9,14 @@ firmware 0.4.x, and older firmware (≤ 0.3.2) no longer works with the new app 
 
 For the reasoning behind individual choices see `docs/DECISIONS.md`; this file only says what changed.
 
+## 0.7.1 — unreleased (2026-11-25)
+
+**Firmware 0.7.1**; the app stays at 0.7.0 (same protocol 2).
+
+### Sensor firmware
+- **Faster `TofNetJumpDetector`:** it now needs about 23 % of the processor time instead of about 83 %, also
+  with the app connected, so it keeps up with all 416 samples per second. It detects the same jumps as before.
+
 ## 0.7.0 — unreleased (2026-11-24)
 
 **App 0.7.0** (build 6) and **firmware 0.7.0**. New BLE protocol 2: app 0.7.0 needs firmware 0.7.0. Firmware
