@@ -41,7 +41,7 @@ There is no charging state: the board's charger only drives the red LED and the 
 
 | Bytes | Field | Type | Meaning |
 |---|---|---|---|
-| 0 | `proto` | u8 | Protocol version (1) |
+| 0 | `proto` | u8 | Protocol version (2) |
 | 1–2 | `jump_id` | u16 | +1 per new jump (wraps); takeoff and landing of a jump share it |
 | 3 | `kind` | u8 | bit 0: 0 = takeoff, 1 = landing; bits 1–2: 0 = provisional, 1 = final, 2 = retracted |
 | 4–7 | `t_ms` | u32 | Time of the event in ms since the sensor started (0 for a retraction) |
