@@ -55,7 +55,7 @@
 // Every string must be at most DIS_STRING_MAX (32) bytes.
 // ============================================================================
 
-#define FIRMWARE_VERSION "0.6.1"    // Firmware Revision String; bump on every release
+#define FIRMWARE_VERSION "0.7.1"    // Firmware Revision String; bump on every release
 #define HARDWARE_REVISION "0.1"     // Hardware Revision String; change with the PCB/board
 #define MANUFACTURER_NAME "OpenToF"
 #define MODEL_NUMBER "OpenToF Sensor"

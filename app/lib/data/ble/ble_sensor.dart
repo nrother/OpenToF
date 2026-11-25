@@ -117,14 +117,9 @@ class BleSensor implements Sensor {
   static const _retryDelay = Duration(seconds: 2);
   static const _connectTimeout = Duration(seconds: 10);
 
-  /// Pause between connection attempts after the sensor was sent to sleep:
-  /// long enough not to catch it again while it still blinks its goodbye, and
-  /// fewer attempts while nothing can answer. Short enough to find it well
-  /// within the minute it stays awake after being woken.
-  static const _asleepRetryDelay = Duration(seconds: 10);
-
   final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
+  final _unsupported = StreamController<int>.broadcast();
   final _state = StreamController<SensorConnectionState>.broadcast();
 
   SensorConnectionState _current = SensorConnectionState.disconnected;
@@ -132,10 +127,6 @@ class BleSensor implements Sensor {
   bool _running = false;
   Completer<void>? _stop;
   BluetoothCharacteristic? _nameChar;
-  BluetoothCharacteristic? _commandChar;
-
-  /// True from a successful [sleep] until the next established connection.
-  bool _sentToSleep = false;
   List<BluetoothService>? _services;
   final List<StreamSubscription<dynamic>> _charSubs = [];
 
@@ -143,6 +134,8 @@ class BleSensor implements Sensor {
   Stream<JumpEvent> get events => _events.stream;
   @override
   Stream<int> get batteryLevel => _battery.stream;
+  @override
+  Stream<int> get unsupportedProtocol => _unsupported.stream;
   @override
   Stream<SensorConnectionState> get connectionState => _state.stream;
   @override
@@ -169,7 +162,6 @@ class BleSensor implements Sensor {
           timeout: _connectTimeout,
         );
         await _subscribe();
-        _sentToSleep = false;
         _set(SensorConnectionState.connected);
         await Future.any([
           _device.connectionState.firstWhere(
@@ -184,10 +176,7 @@ class BleSensor implements Sensor {
         _set(SensorConnectionState.disconnected);
       }
       if (!_wantConnected) break;
-      await Future.any([
-        Future<void>.delayed(_sentToSleep ? _asleepRetryDelay : _retryDelay),
-        _stop!.future,
-      ]);
+      await Future.any([Future<void>.delayed(_retryDelay), _stop!.future]);
     }
   }
 
@@ -218,10 +207,6 @@ class BleSensor implements Sensor {
       BleProtocol.batteryLevelCharacteristic,
     );
     _nameChar = find(BleProtocol.jumpService, BleProtocol.nameCharacteristic);
-    _commandChar = find(
-      BleProtocol.jumpService,
-      BleProtocol.commandCharacteristic,
-    );
 
     if (event == null) {
       throw StateError('Jump event characteristic not found (old firmware?)');
@@ -232,7 +217,12 @@ class BleSensor implements Sensor {
     _charSubs.add(
       event.onValueReceived.listen((v) {
         final e = BleProtocol.parseEvent(v, DateTime.now());
-        if (e != null) _events.add(e);
+        if (e != null) {
+          _events.add(e);
+        } else {
+          final proto = BleProtocol.foreignProtocol(v);
+          if (proto != null) _unsupported.add(proto);
+        }
       }),
     );
     await event.setNotifyValue(true);
@@ -256,7 +246,6 @@ class BleSensor implements Sensor {
     }
     _charSubs.clear();
     _nameChar = null;
-    _commandChar = null;
     _services = null;
   }
 
@@ -286,23 +275,6 @@ class BleSensor implements Sensor {
     final c = _nameChar;
     if (c == null) throw StateError('Sensor not connected');
     await c.write(BleProtocol.encodeName(name));
-  }
-
-  @override
-  bool get supportsSleep => _commandChar != null;
-
-  @override
-  Future<void> sleep() async {
-    final c = _commandChar;
-    if (c == null) throw StateError('Sensor not connected or cannot sleep');
-    try {
-      await c.write(BleProtocol.encodeCommand(SensorCommand.sleep));
-    } catch (_) {
-      // The sensor may drop the link before its write response arrives; a
-      // failed write only counts while the connection is still up.
-      if (_device.isConnected) rethrow;
-    }
-    _sentToSleep = true;
   }
 
   @override
@@ -354,12 +326,6 @@ class BleSensor implements Sensor {
   }
 
   @override
-  Future<SensorInfo?> readSensorInfo() async {
-    final v = await _readJumpChar(BleProtocol.infoCharacteristic);
-    return v == null ? null : BleProtocol.parseInfo(v);
-  }
-
-  @override
   Future<AlgorithmMetadata> readAlgorithmMetadata() async {
     Future<String?> readString(String characteristic) async {
       final v = await _readJumpChar(characteristic);
@@ -386,6 +352,7 @@ class BleSensor implements Sensor {
     await disconnect();
     await _events.close();
     await _battery.close();
+    await _unsupported.close();
     await _state.close();
   }
 }

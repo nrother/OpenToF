@@ -7,18 +7,16 @@ import 'sensor.dart';
 
 /// Debug-only simulated sensor. Never selected in release builds.
 ///
-/// Speaks protocol 1 like the real firmware's demo mode: takeoff and landing
+/// Speaks protocol 2 like the real firmware's demo mode: takeoff and landing
 /// events on its own device clock, sharing a jump id per jump. [emitJump]
 /// sends final events right away; [startBouncing] sends each event as a
 /// provisional estimate followed by the final one, with confidence, an
 /// occasional reason bit, two intensity fields, and now and then a false
-/// landing that is retracted. It can be sent to deep sleep and woken again
-/// ([sleep], [wake]) like firmware with deep sleep.
+/// landing that is retracted. [restart] simulates a sensor reboot.
 class MockSensor implements Sensor {
   MockSensor({
     this.id = 'mock-1',
     this._name = 'OpenToF-Mock',
-    this.supportsSleep = true,
     DateTime Function()? clock,
     int seed = 1,
   }) : _clock = clock ?? DateTime.now,
@@ -39,14 +37,9 @@ class MockSensor implements Sensor {
   final math.Random _random;
   late DateTime _epoch;
 
-  /// Set to false to behave like firmware without deep sleep.
-  @override
-  bool supportsSleep;
-  bool _asleep = false;
-  int _bootCount = 1;
-
   final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
+  final _unsupported = StreamController<int>.broadcast();
   final _state = StreamController<SensorConnectionState>.broadcast();
 
   SensorConnectionState _current = SensorConnectionState.disconnected;
@@ -68,20 +61,20 @@ class MockSensor implements Sensor {
   @override
   Stream<int> get batteryLevel => _battery.stream;
   @override
+  Stream<int> get unsupportedProtocol => _unsupported.stream;
+  @override
   Stream<SensorConnectionState> get connectionState => _state.stream;
   @override
   SensorConnectionState get currentConnectionState => _current;
 
   bool get isBouncing => _bounceTimer != null;
 
-  bool get isAsleep => _asleep;
-
   @override
   Future<void> connect() async {
     _wantConnected = true;
     _setState(SensorConnectionState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (!_wantConnected || _asleep) return;
+    if (!_wantConnected) return;
     _setState(SensorConnectionState.connected);
     _battery.add(_batteryLevel);
     _batteryTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
@@ -110,17 +103,6 @@ class MockSensor implements Sensor {
   Future<void> writeName(String name) async => _name = name;
 
   @override
-  Future<void> sleep() async {
-    if (_current != SensorConnectionState.connected) {
-      throw StateError('Sensor not connected');
-    }
-    if (!supportsSleep) throw StateError('Sensor cannot sleep');
-    _asleep = true;
-    stopBouncing();
-    _setState(SensorConnectionState.disconnected);
-  }
-
-  @override
   Future<DeviceInfo> readDeviceInfo() async => const DeviceInfo(
     manufacturerName: 'OpenToF',
     modelNumber: 'OpenToF Sensor (simulated)',
@@ -129,10 +111,6 @@ class MockSensor implements Sensor {
     firmwareRevision: '0.6.0',
     softwareRevision: 'MockJumpDetector',
   );
-
-  @override
-  Future<SensorInfo?> readSensorInfo() async =>
-      SensorInfo(protocol: 1, bootCount: _bootCount, deviceTimeMs: _nowMs());
 
   @override
   Future<AlgorithmMetadata> readAlgorithmMetadata() async =>
@@ -316,17 +294,20 @@ class MockSensor implements Sensor {
   void simulateDisconnect() => _setState(SensorConnectionState.disconnected);
 
   void simulateReconnect() {
-    if (!_wantConnected || _asleep) return;
+    if (!_wantConnected) return;
     _setState(SensorConnectionState.connected);
     _battery.add(_batteryLevel);
   }
 
-  /// Shakes the sleeping sensor awake. Like the real one it starts over
-  /// (new boot, device clock and jump ids from zero) and the app reconnects.
-  void wake() {
-    if (!_asleep) return;
-    _asleep = false;
-    _bootCount++;
+  /// Simulates an event from firmware speaking another protocol version
+  /// (the app drops it and warns).
+  void emitForeignProtocol([int protocol = 1]) {
+    if (_current == SensorConnectionState.connected) _unsupported.add(protocol);
+  }
+
+  /// Reboots the sensor. Like the real one it starts over (device clock and
+  /// jump ids from zero) and the app reconnects.
+  void restart() {
     _epoch = _clock();
     _jumpId = 0;
     _takeoffMs = null;
@@ -357,6 +338,7 @@ class MockSensor implements Sensor {
     await disconnect();
     await _events.close();
     await _battery.close();
+    await _unsupported.close();
     await _state.close();
   }
 }

@@ -34,7 +34,7 @@ delays never change the measured times. The details are in [`docs/PROTOCOL.md`](
 - CSV export of a routine or of the last 30 s / 1 min / 5 min of jumps.
 - Missed and uncertain jumps are flagged; optional extra per-jump values from the detection algorithm
   (confidence, landing and push-off intensity, …).
-- The sensor sleeps when nobody uses it and wakes up when it is shaken; the app can also send it to sleep.
+- The sensor sleeps when nobody uses it and wakes up when it is shaken.
   Its LED signals are explained in the app (*Settings → LED signals*).
 - In-app changelog, English and German, light and dark theme, Android 10+ and iOS 15+.
 - Pluggable detection algorithms in the firmware; a demo mode sends simulated jumps for testing without a
@@ -101,6 +101,6 @@ changed, not why). Its format is read by the app, so keep to it:
 ## Status
 
 Early development. The firmware runs on real hardware and the app is tested against a simulated sensor; a full
-end-to-end check over real Bluetooth is still open. The default detector (`BedCycleJumpDetector`) was developed on
-recorded trampoline data and is still being tuned. The BLE UUIDs are placeholders until the protocol is frozen.
+end-to-end check over real Bluetooth is still open. The default detector (`TofNetJumpDetector`, tof_net) was trained on
+recorded trampoline data and is not yet verified on the sensor. The BLE UUIDs are placeholders until the protocol is frozen.
 What is still open is listed in [`docs/ROADMAP.md`](docs/ROADMAP.md).

@@ -1,4 +1,4 @@
-/// Raw events emitted by a sensor (protocol 1, see docs/DECISIONS.md).
+/// Raw events emitted by a sensor (protocol 2, see docs/DECISIONS.md).
 enum JumpEventType { takeoff, landing }
 
 /// `finalized` = the algorithm's refined estimate; `retracted` withdraws an
@@ -40,20 +40,4 @@ class JumpEvent {
   final List<int> extras;
 
   bool get isLanding => type == JumpEventType.landing;
-}
-
-/// The sensor's Info characteristic.
-class SensorInfo {
-  const SensorInfo({
-    required this.protocol,
-    required this.bootCount,
-    required this.deviceTimeMs,
-  });
-
-  final int protocol;
-
-  /// Increases on every sensor start: a change means the device clock and the
-  /// jump ids restarted.
-  final int bootCount;
-  final int deviceTimeMs;
 }

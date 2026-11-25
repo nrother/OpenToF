@@ -25,9 +25,7 @@ class SessionState {
     this.events = const [],
     this.chartFrozenAt,
     this.algorithm = AlgorithmMetadata.none,
-    this.sensorInfo,
-    this.supportsSleep = false,
-    this.asleep = false,
+    this.protocolMismatch = false,
   });
 
   final SensorConnectionState connection;
@@ -53,17 +51,9 @@ class SessionState {
   /// What the sensor's algorithm reports per event (re-read on connect).
   final AlgorithmMetadata algorithm;
 
-  /// Protocol version and boot counter (re-read on connect); null until read
-  /// or if the sensor doesn't expose it.
-  final SensorInfo? sensorInfo;
-
-  /// Whether the sensor could be sent to deep sleep when it was last
-  /// connected (false until the first connection and for older firmware).
-  final bool supportsSleep;
-
-  /// True after the app sent the sensor to sleep, until it is connected
-  /// again. The sensor is then expected to be gone, not a lost connection.
-  final bool asleep;
+  /// The connected sensor sends events in a protocol version this app does
+  /// not understand. Cleared on disconnect or when a supported event arrives.
+  final bool protocolMismatch;
 
   SessionState copyWith({
     SensorConnectionState? connection,
@@ -79,9 +69,7 @@ class SessionState {
     DateTime? chartFrozenAt,
     bool clearChartFrozen = false,
     AlgorithmMetadata? algorithm,
-    SensorInfo? sensorInfo,
-    bool? supportsSleep,
-    bool? asleep,
+    bool? protocolMismatch,
   }) => SessionState(
     connection: connection ?? this.connection,
     batteryLevel: batteryLevel ?? this.batteryLevel,
@@ -96,9 +84,7 @@ class SessionState {
         ? null
         : (chartFrozenAt ?? this.chartFrozenAt),
     algorithm: algorithm ?? this.algorithm,
-    sensorInfo: sensorInfo ?? this.sensorInfo,
-    supportsSleep: supportsSleep ?? this.supportsSleep,
-    asleep: asleep ?? this.asleep,
+    protocolMismatch: protocolMismatch ?? this.protocolMismatch,
   );
 }
 
@@ -117,7 +103,6 @@ class SessionController extends Notifier<SessionState> {
   BatteryEstimator _battery = BatteryEstimator();
   Timer? _timer;
   bool _wasConnected = false;
-  int? _bootCount;
 
   /// Serials of jumps dropped as implausible; their later updates are ignored.
   final Set<int> _filtered = {};
@@ -135,7 +120,6 @@ class SessionController extends Notifier<SessionState> {
     _machine = RoutineMachine();
     _battery = BatteryEstimator();
     _wasConnected = false;
-    _bootCount = null;
     _filtered.clear();
     _timer = Timer.periodic(_tickInterval, (_) => _tick());
     ref.onDispose(_teardown);
@@ -153,7 +137,12 @@ class SessionController extends Notifier<SessionState> {
     _subs
       ..add(sensor.connectionState.listen(_onConnection))
       ..add(sensor.events.listen(_onSensorEvent))
-      ..add(sensor.batteryLevel.listen(_onBattery));
+      ..add(sensor.batteryLevel.listen(_onBattery))
+      ..add(
+        sensor.unsupportedProtocol.listen(
+          (_) => state = state.copyWith(protocolMismatch: true),
+        ),
+      );
     unawaited(sensor.connect().catchError((Object _) {}));
   }
 
@@ -184,8 +173,7 @@ class SessionController extends Notifier<SessionState> {
       connection: c,
       routine: _machine.state,
       events: _withConnectionEvent(c),
-      supportsSleep: connected ? _sensor?.supportsSleep : null,
-      asleep: connected ? false : null,
+      protocolMismatch: connected ? null : false,
     );
     if (connected) {
       unawaited(_refreshName());
@@ -247,25 +235,19 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
-  /// A changed boot counter means the device clock and jump ids restarted.
   Future<void> _refreshAlgorithm() async {
     final sensor = _sensor;
     if (sensor == null) return;
-    final info = await sensor.readSensorInfo();
-    if (!ref.mounted) return;
-    if (info != null) {
-      if (_bootCount != null && info.bootCount != _bootCount) {
-        _assembler.reset();
-      }
-      _bootCount = info.bootCount;
-    }
     final algorithm = await sensor.readAlgorithmMetadata();
     if (!ref.mounted) return;
     _assembler.metadata = algorithm;
-    state = state.copyWith(algorithm: algorithm, sensorInfo: info);
+    state = state.copyWith(algorithm: algorithm);
   }
 
   void _onSensorEvent(JumpEvent e) {
+    if (state.protocolMismatch) {
+      state = state.copyWith(protocolMismatch: false);
+    }
     switch (_assembler.onEvent(e)) {
       case null:
         return;
@@ -432,16 +414,6 @@ class SessionController extends Notifier<SessionState> {
   void resumeChart() => state = state.copyWith(clearChartFrozen: true);
 
   // ---- device ----
-
-  /// Sends the connected sensor to deep sleep. It disconnects by itself; the
-  /// sensor connection keeps retrying and finds it again once it is woken.
-  Future<void> sleepSensor() async {
-    final sensor = _sensor;
-    if (sensor == null) return;
-    await sensor.sleep();
-    if (!ref.mounted) return;
-    state = state.copyWith(asleep: true);
-  }
 
   Future<void> renameDevice(String name) async {
     final sensor = _sensor;

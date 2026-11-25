@@ -374,6 +374,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get protocolMismatchTitle => 'Sensor uses a different protocol';
+
+  @override
+  String get protocolMismatchBody =>
+      'Its jumps are ignored. Update the sensor firmware or this app.';
+
+  @override
   String get versionMismatchTitle => 'Sensor firmware doesn\'t match this app';
 
   @override
@@ -386,12 +393,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get algorithmSection => 'Detection algorithm';
-
-  @override
-  String get protocolVersionLabel => 'Protocol version';
-
-  @override
-  String get bootCountLabel => 'Sensor starts';
 
   @override
   String get confidenceKindLabel => 'Confidence';
@@ -630,44 +631,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.';
 
   @override
-  String get connectionAsleep => 'Sensor asleep';
-
-  @override
-  String get sleepSensor => 'Put sensor to sleep';
-
-  @override
-  String get sleepSensorHelp =>
-      'Saves battery until you need the sensor again.';
-
-  @override
-  String get sleepSensorNotConnected =>
-      'Only possible while the sensor is connected.';
-
-  @override
-  String get sleepSensorAsleep =>
-      'The sensor is asleep. Shake or hit it to wake it up; the app then reconnects by itself.';
-
-  @override
-  String get sleepConfirmTitle => 'Put sensor to sleep?';
-
-  @override
-  String get sleepConfirmBody =>
-      'The sensor disconnects, blinks 6 times and sleeps until it is moved.\n\nTo wake it up, shake or hit it: it reacts within about 4 seconds, and the app reconnects by itself.';
-
-  @override
-  String get sleepAction => 'Put to sleep';
-
-  @override
-  String get sleepStarted =>
-      'The sensor is going to sleep. Shake or hit it to wake it up.';
-
-  @override
-  String sleepFailed(String message) {
-    return 'Could not put the sensor to sleep: $message';
-  }
-
-  @override
-  String get simWake => 'Simulate wake-up';
+  String get simRestart => 'Simulate sensor restart';
 
   @override
   String get changelogTileHelp => 'Show what changed';
