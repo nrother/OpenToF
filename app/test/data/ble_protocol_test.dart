@@ -5,6 +5,43 @@ import 'package:opentof_app/domain/sensor_events.dart';
 final t = DateTime(2026, 1, 1);
 
 void main() {
+  test('health parses PLL lock and little-endian millihertz', () {
+    final health = BleProtocol.parseHealth([1, 3, 0x7D, 0x59, 6, 0])!;
+    expect(health.pllLocked, isTrue);
+    expect(health.pllFrequencyHz, 416.125);
+    expect(health.uptimeSeconds, isNull);
+    final acquiring = BleProtocol.parseHealth([1, 1, 0, 0x59, 6, 0])!;
+    expect(acquiring.pllLocked, isFalse);
+    expect(acquiring.pllFrequencyHz, 416);
+  });
+
+  test('health handles absent PLL, extensions and invalid prefixes', () {
+    final demo = BleProtocol.parseHealth([1, 0, 0, 0, 0, 0])!;
+    expect(demo.pllLocked, isNull);
+    expect(demo.pllFrequencyHz, isNull);
+    final extended = BleProtocol.parseHealth([
+      1, 0x83, 0x7D, 0x59, 6, 0, 0x78, 0x56, 0x34, 0x12, 42,
+    ])!;
+    expect(extended.pllLocked, isTrue);
+    expect(extended.pllFrequencyHz, 416.125);
+    expect(extended.uptimeSeconds, 0x12345678);
+    expect(BleProtocol.parseHealth([]), isNull);
+    expect(BleProtocol.parseHealth([1, 3, 0, 0, 0]), isNull);
+    expect(BleProtocol.parseHealth([2, 3, 0, 0, 0, 0]), isNull);
+  });
+
+  test('uptime is available without a PLL and rejects truncated values', () {
+    expect(BleProtocol.parseHealth([1, 0, 0, 0, 0, 0, 0, 0, 0, 0])!.uptimeSeconds, 0);
+    final max = BleProtocol.parseHealth([
+      1, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF,
+    ])!;
+    expect(max.uptimeSeconds, 0xFFFFFFFF);
+    expect(max.pllLocked, isNull);
+    for (var length = 7; length < 10; length++) {
+      expect(BleProtocol.parseHealth([1, ...List.filled(length - 1, 0)]), isNull);
+    }
+  });
+
   test('event parses the fixed little-endian layout and the extras', () {
     final e = BleProtocol.parseEvent([
       2, // proto

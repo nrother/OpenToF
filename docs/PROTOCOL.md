@@ -15,6 +15,7 @@
 | Reasons | `6f70656e-546f-4600-0008-000000000000` | Read | JSON array of up to 8 strings; entry *i* names reason bit *i* |
 | Confidence kind | `6f70656e-546f-4600-0009-000000000000` | Read | `none`, `heuristic` (higher = better) or `calibrated` (N = N % of such events are right) |
 | Device name | `6f70656e-546f-4600-0004-000000000000` | Read/Write | UTF-8, 1–20 bytes, stored in flash; default `OpenToF` |
+| Health | `6f70656e-546f-4600-000b-000000000000` | Read/Notify | PLL status, frequency and uptime, extensible layout below |
 
 - Each JSON string is at most 512 bytes (BLE attribute limit).
 - An invalid name write is silently ignored by the firmware.
@@ -34,6 +35,20 @@
 | Generic Access `1800` | Appearance | `2A01` | `0x0540` (Generic Sensor) |
 
 There is no charging state: the board's charger only drives the red LED and the MCU can't read it.
+
+## Health layout
+
+Information about device health.
+
+| Bytes | Field | Type | Meaning |
+|---|---|---|---|
+| 0 | `health_version` | u8 | Health layout version (1), independent of the event protocol version |
+| 1 | `flags` | u8 | Bit 0: PLL available; bit 1: PLL locked; remaining bits reserved (currently zero) |
+| 2–5 | `pll_frequency_millihz` | u32 | PLL sample frequency in 0.001 Hz, rounded to the nearest mHz |
+| 6–9 | `uptime_seconds` | u32 | Whole seconds since boot |
+
+While acquiring, the frequency is the initial estimate (416 Hz).
+Demo mode has no PLL; both flags and frequency are zero. When bit 0 is clear, clients should treat PLL values as unavailable.
 
 ## Event layout
 

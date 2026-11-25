@@ -15,6 +15,7 @@
 #define UUID_FIELDS "6f70656e-546f-4600-0007-000000000000"
 #define UUID_REASONS "6f70656e-546f-4600-0008-000000000000"
 #define UUID_CONFIDENCE_KIND "6f70656e-546f-4600-0009-000000000000"
+#define UUID_HEALTH "6f70656e-546f-4600-000b-000000000000"
 
 // Human-readable descriptions of the custom characteristics. They are sent as GATT
 // "Characteristic User Description" descriptors (0x2901).
@@ -25,6 +26,7 @@
 #define DESC_REASONS "Reason bit metadata"
 #define DESC_CONFIDENCE_KIND "Confidence kind"
 #define DESC_NAME "Device name"
+#define DESC_HEALTH "Device health"
 
 // ============================================================================
 // Bluetooth SIG assigned 16-bit UUIDs (Assigned Numbers)

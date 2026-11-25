@@ -30,7 +30,11 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
   new algorithms can add values without an app update; the app shows whatever the sensor declares.
 - **No replay buffer**: the connection is assumed to stay up; events while disconnected are lost and shown as
   missed. Dropped from the algorithm team's proposal as well: a live-state characteristic (provisional events cover
-  it), device health, a debug stream. Possible later: landing position / landing type as custom fields.
+  it), a debug stream. Possible later: landing position / landing type as custom fields.
+- **Device health has its own Read/Notify characteristic** (2026-11-25): publish PLL lock status and sample
+  frequency and uptime in whole seconds once per second, independently of jumps, with a versioned prefix that
+  allows future health fields.
+  Battery stays on the SIG Battery Level characteristic. This is an optional addition to protocol 2.
 - **Protocol 2 drops the Info characteristic (boot counter, device time) and the sleep command** (2026-11-24). Why:
   removed in the firmware cleanup to keep the firmware small and simple; the features weren't worth their
   complexity. Counted as a protocol change, so app and firmware must match.

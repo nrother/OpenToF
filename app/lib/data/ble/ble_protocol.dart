@@ -18,6 +18,8 @@ import '../../domain/sensor_events.dart';
 ///  - Reasons          (Read): JSON array naming the reason bits
 ///  - Confidence kind  (Read): "none" | "heuristic" | "calibrated"
 ///  - Name             (Read/Write): UTF-8 string
+///  - Health           (Read/Notify): version u8, flags u8, PLL frequency u32 mHz
+///                     followed by uptime u32 seconds
 
 class BleProtocol {
   BleProtocol._();
@@ -34,6 +36,7 @@ class BleProtocol {
   static const reasonsCharacteristic = '6f70656e-546f-4600-0008-000000000000';
   static const confidenceKindCharacteristic =
       '6f70656e-546f-4600-0009-000000000000';
+  static const healthCharacteristic = '6f70656e-546f-4600-000b-000000000000';
 
   // Standard Bluetooth SIG Battery Service / Battery Level.
   static const batteryService = '180f';
@@ -113,6 +116,21 @@ class BleProtocol {
     return level <= 100 ? level : null;
   }
 
+  /// Accept appended fields and unknown flag bits for future health additions.
+  /// A changed prefix layout requires a new health version.
+  static SensorHealth? parseHealth(List<int> data) {
+    if (data.length < 6 || data[0] != 1) return null;
+    if (data.length > 6 && data.length < 10) return null;
+    final b = ByteData.sublistView(Uint8List.fromList(data));
+    final flags = b.getUint8(1);
+    final available = (flags & 1) != 0;
+    return SensorHealth(
+      pllLocked: available ? (flags & 2) != 0 : null,
+      pllFrequencyHz: available ? b.getUint32(2, Endian.little) / 1000.0 : null,
+      uptimeSeconds: data.length >= 10 ? b.getUint32(6, Endian.little) : null,
+    );
+  }
+
   static String? parseName(List<int> data) => parseUtf8String(data);
 
   /// Shared by every Read-only UTF-8 string characteristic (name, Device
@@ -123,4 +141,19 @@ class BleProtocol {
   }
 
   static List<int> encodeName(String name) => utf8.encode(name);
+}
+
+class SensorHealth {
+  const SensorHealth({
+    required this.pllLocked,
+    required this.pllFrequencyHz,
+    this.uptimeSeconds,
+  });
+
+  /// Both fields are null when this source has no PLL (demo mode).
+  final bool? pllLocked;
+  final double? pllFrequencyHz;
+
+  /// Whole seconds since boot; null for older six-byte health payloads.
+  final int? uptimeSeconds;
 }

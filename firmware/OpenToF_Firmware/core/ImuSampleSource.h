@@ -18,6 +18,14 @@ class ImuSampleSource : public TransitionSource {
   const char* reasonsJson() const override { return _detector.reasonsJson(); }
   const char* confidenceKind() const override { return _detector.confidenceKind(); }
 
+  HealthStatus health() const override {
+    HealthStatus status;
+    status.pllAvailable = true;
+    status.pllLocked = _sampleRatePll.locked();
+    status.pllFrequencyHz = _sampleRatePll.rateHz();
+    return status;
+  }
+
  protected:
   struct __attribute__((packed)) RawImuSample {
     int16_t gx;
