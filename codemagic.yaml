@@ -1,6 +1,6 @@
 workflows:
   ios-unsigned-ipa:
-    name: Flutter iOS unsigned IPA
+    name: Flutter iOS unsigned IPA (monorepo app/)
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -12,32 +12,47 @@ workflows:
       cocoapods: default
 
     scripts:
-      - name: Get Flutter packages
+      - name: Resolve Flutter dependencies
         script: |
           flutter pub get
 
-      - name: Build release iOS app without code signing
+      - name: Build iOS Release without code signing
         script: |
-          flutter build ios --release --no-codesign 2>&1 | tee "$CM_BUILD_DIR/flutter-ios-build.log"
+          flutter build ios --release --no-codesign
 
-      - name: Package unsigned IPA
+      - name: Package and verify unsigned IPA
         script: |
-          APP_PATH="$(find build/ios/iphoneos -maxdepth 1 -type d -name '*.app' -print -quit 2>/dev/null || true)"
+          IOS_BUILD_DIR="$CM_BUILD_DIR/app/build/ios"
+          DEVICE_BUILD_DIR="$IOS_BUILD_DIR/iphoneos"
+          IPA_DIR="$IOS_BUILD_DIR/ipa"
+          STAGING_DIR="$IPA_DIR/ipa-staging"
+          LOG_FILE="$IPA_DIR/package-unsigned-ipa.log"
+
+          mkdir -p "$IPA_DIR"
+          APP_PATH="$(find "$DEVICE_BUILD_DIR" -maxdepth 1 -type d -name '*.app' -print -quit 2>/dev/null || true)"
+          if [[ -z "$APP_PATH" || ! -d "$APP_PATH" ]]; then
+            echo "ERROR: No .app bundle found in $DEVICE_BUILD_DIR" | tee -a "$LOG_FILE"
+            echo "Searching build/ios for app bundles:" | tee -a "$LOG_FILE"
+            find "$IOS_BUILD_DIR" -maxdepth 5 -name '*.app' -print 2>&1 | tee -a "$LOG_FILE" || true
+            exit 1
+          fi
+
           APP_BUNDLE="$(basename "$APP_PATH")"
-          IPA_NAME="${APP_BUNDLE%.app}-unsigned.ipa"
-          ARTIFACT_DIR="$CM_BUILD_DIR/artifacts"
-          STAGING_DIR="$CM_BUILD_DIR/ipa-staging"
+          IPA_PATH="$IPA_DIR/${APP_BUNDLE%.app}-unsigned.ipa"
 
-          rm -rf "$STAGING_DIR"
-          mkdir -p "$STAGING_DIR/Payload" "$ARTIFACT_DIR"
+          rm -rf "$STAGING_DIR" "$IPA_PATH"
+          mkdir -p "$STAGING_DIR/Payload"
           ditto "$APP_PATH" "$STAGING_DIR/Payload/$APP_BUNDLE"
 
-          (cd "$STAGING_DIR" && /usr/bin/zip -qry "$ARTIFACT_DIR/$IPA_NAME" Payload)
+          (cd "$STAGING_DIR" && /usr/bin/zip -qry "$IPA_PATH" Payload)
           rm -rf "$STAGING_DIR"
 
-          echo "Created: $ARTIFACT_DIR/$IPA_NAME"
-          /usr/bin/unzip -l "$ARTIFACT_DIR/$IPA_NAME" | head -n 20
+          test -s "$IPA_PATH"
+          /usr/bin/unzip -l "$IPA_PATH" | head -n 25 | tee -a "$LOG_FILE"
+
+          ls -lah "$IPA_DIR" | tee -a "$LOG_FILE"
 
     artifacts:
-      - artifacts/*-unsigned.ipa
-      - flutter-ios-build.log
+      - app/build/ios/ipa/*-unsigned.ipa
+      - app/build/ios/ipa/*.log
+      - app/build/ios/iphoneos/*.app
