@@ -1,0 +1,43 @@
+workflows:
+  ios-unsigned-ipa:
+    name: Flutter iOS unsigned IPA
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    working_directory: app
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Build release iOS app without code signing
+        script: |
+          flutter build ios --release --no-codesign 2>&1 | tee "$CM_BUILD_DIR/flutter-ios-build.log"
+
+      - name: Package unsigned IPA
+        script: |
+          APP_PATH="$(find build/ios/iphoneos -maxdepth 1 -type d -name '*.app' -print -quit 2>/dev/null || true)"
+          APP_BUNDLE="$(basename "$APP_PATH")"
+          IPA_NAME="${APP_BUNDLE%.app}-unsigned.ipa"
+          ARTIFACT_DIR="$CM_BUILD_DIR/artifacts"
+          STAGING_DIR="$CM_BUILD_DIR/ipa-staging"
+
+          rm -rf "$STAGING_DIR"
+          mkdir -p "$STAGING_DIR/Payload" "$ARTIFACT_DIR"
+          ditto "$APP_PATH" "$STAGING_DIR/Payload/$APP_BUNDLE"
+
+          (cd "$STAGING_DIR" && /usr/bin/zip -qry "$ARTIFACT_DIR/$IPA_NAME" Payload)
+          rm -rf "$STAGING_DIR"
+
+          echo "Created: $ARTIFACT_DIR/$IPA_NAME"
+          /usr/bin/unzip -l "$ARTIFACT_DIR/$IPA_NAME" | head -n 20
+
+    artifacts:
+      - artifacts/*-unsigned.ipa
+      - flutter-ios-build.log
