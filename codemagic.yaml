@@ -1,6 +1,6 @@
 workflows:
   ios-unsigned-ipa:
-    name: Flutter iOS unsigned IPA (monorepo app/)
+    name: Flutter iOS unsigned IPA
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -53,6 +53,8 @@ workflows:
           ls -lah "$IPA_DIR" | tee -a "$LOG_FILE"
 
     artifacts:
+      - $IPA_PATH
       - app/build/ios/ipa/*-unsigned.ipa
       - app/build/ios/ipa/*.log
       - app/build/ios/iphoneos/*.app
+      - **/*.ipa
