@@ -57,4 +57,4 @@ workflows:
       - app/build/ios/ipa/*-unsigned.ipa
       - app/build/ios/ipa/*.log
       - app/build/ios/iphoneos/*.app
-      - **/*.ipa
+      - "**/*.ipa"
