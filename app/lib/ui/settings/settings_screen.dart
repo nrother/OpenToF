@@ -276,6 +276,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onSelectionChanged: (s) => notifier.setThemeMode(s.first),
               ),
             ),
+            ListTile(
+              title: Text(l.language),
+              trailing: SegmentedButton<AppLanguage>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: AppLanguage.system,
+                    label: Text(l.languageSystem),
+                  ),
+                  // Language names stay in their own language.
+                  const ButtonSegment(
+                    value: AppLanguage.en,
+                    label: Text('English'),
+                  ),
+                  const ButtonSegment(
+                    value: AppLanguage.de,
+                    label: Text('Deutsch'),
+                  ),
+                ],
+                selected: {settings.language},
+                onSelectionChanged: (s) => notifier.setLanguage(s.first),
+              ),
+            ),
 
             SettingsSection(l.displaySection),
             SwitchListTile(
@@ -289,6 +312,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: Text(l.showTotalTimeHelp),
               value: settings.showTotalTime,
               onChanged: notifier.setShowTotalTime,
+            ),
+            SwitchListTile(
+              title: Text(l.showFlightDelta),
+              subtitle: Text(l.showFlightDeltaHelp),
+              value: settings.showFlightDelta,
+              onChanged: notifier.setShowFlightDelta,
             ),
             SwitchListTile(
               title: Text(l.showJumpDetails),

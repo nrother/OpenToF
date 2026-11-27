@@ -8,6 +8,7 @@
 #include "../config/FirmwareConfig.h"
 #include "DeviceName.h"
 #include "Logging.h"
+#include "Micros64.h"
 #include "Transition.h"
 
 // Longest string a Device Information characteristic can hold.
@@ -28,11 +29,13 @@ static BLECharacteristic fieldsChar(UUID_FIELDS, BLERead, META_MAX_BYTES, false)
 static BLECharacteristic reasonsChar(UUID_REASONS, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic confidenceKindChar(UUID_CONFIDENCE_KIND, BLERead, META_MAX_BYTES, false);
 static BLECharacteristic nameChar(UUID_NAME, BLERead | BLEWrite, NAME_MAX_BYTES, false);
+static BLECharacteristic healthChar(UUID_HEALTH, BLERead | BLENotify, HEALTH_BYTES, false);
 static BLEDescriptor eventDescription(SIG_DESC_USER_DESCRIPTION, DESC_EVENT);
 static BLEDescriptor fieldsDescription(SIG_DESC_USER_DESCRIPTION, DESC_FIELDS);
 static BLEDescriptor reasonsDescription(SIG_DESC_USER_DESCRIPTION, DESC_REASONS);
 static BLEDescriptor confidenceKindDescription(SIG_DESC_USER_DESCRIPTION, DESC_CONFIDENCE_KIND);
 static BLEDescriptor nameDescription(SIG_DESC_USER_DESCRIPTION, DESC_NAME);
+static BLEDescriptor healthDescription(SIG_DESC_USER_DESCRIPTION, DESC_HEALTH);
 
 // ---- Battery service ----
 static BLEService batteryService(SIG_SVC_BATTERY);
@@ -97,6 +100,14 @@ static void setMetaString(BLECharacteristic& c, const char* label, const char* t
 
 static void bleSetBatteryLevel(uint8_t percent) { batteryLevelChar.writeValue(percent); }
 
+static void bleSetHealth(HealthStatus health) {
+  // Use the extended clock so uptime does not reset when millis() wraps.
+  health.uptimeSeconds = static_cast<uint32_t>(micros64() / 1000000ULL);
+  uint8_t payload[HEALTH_BYTES];
+  encodeHealth(health, payload);
+  healthChar.writeValue(payload, sizeof(payload));
+}
+
 static void onNameWritten(BLEDevice central, BLECharacteristic characteristic) {
   (void)central;
   uint8_t buf[NAME_MAX_BYTES + 1];
@@ -147,12 +158,14 @@ static bool bleBegin(const TransitionSource& algorithm) {
   reasonsChar.addDescriptor(reasonsDescription);
   confidenceKindChar.addDescriptor(confidenceKindDescription);
   nameChar.addDescriptor(nameDescription);
+  healthChar.addDescriptor(healthDescription);
 
   jumpService.addCharacteristic(eventChar);
   jumpService.addCharacteristic(fieldsChar);
   jumpService.addCharacteristic(reasonsChar);
   jumpService.addCharacteristic(confidenceKindChar);
   jumpService.addCharacteristic(nameChar);
+  jumpService.addCharacteristic(healthChar);
 
   batteryService.addCharacteristic(batteryLevelChar);
 

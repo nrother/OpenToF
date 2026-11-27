@@ -14,7 +14,7 @@ app (`app/`) that talk over BLE. Start with `README.md` (overview, layout, relea
 
 ## Rules
 - Before committing, follow "Releasing" in `README.md`: version bumps (app and firmware share MAJOR.MINOR), the
-  Changelog format (it is not Keep a Changelog), and `dart run tool/sync_changelog.dart` after editing it.
+  Changelog format (it is not Keep a Changelog), and `dart run tool/sync_changelog.dart` in `app/` after editing it.
 - Ask before switching, creating, merging or rebasing branches.
 - `software/`, `cad/` and `img/` are independent of the BLE protocol; `cad/opentof_housing.py` is the source of the
   `.FCStd`/STL files (see `cad/README.md`).

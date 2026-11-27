@@ -211,9 +211,23 @@ void main() {
 
     final h = await AppHarness.launch(tester);
     expect(find.text('Letzter Sprung'), findsOneWidget);
-    expect(find.text('Routine starten'), findsOneWidget);
+    expect(find.text('Übung starten'), findsOneWidget);
     await h.jump(flightMs: 1234);
     expect(find.text('1,234 s'), findsOneWidget);
+  });
+
+  testWidgets('language setting overrides the device language', (tester) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('de')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+
+    final h = await AppHarness.launch(tester, prefs: {'language': 'en'});
+    expect(find.text('Start routine'), findsOneWidget);
+
+    await openSettings(h);
+    await tester.tap(find.text('Deutsch'));
+    await tester.pump();
+    expect(find.text('Sprache'), findsOneWidget);
+    expect((await SharedPreferences.getInstance()).getString('language'), 'de');
   });
 
   testWidgets('first launch: main screen, pair via hint, scan and select', (
@@ -331,6 +345,29 @@ void main() {
     expect(find.text('0.1'), findsOneWidget);
     expect(find.text('0.6.0'), findsOneWidget);
     expect(find.text('MockJumpDetector'), findsOneWidget);
+  });
+
+  testWidgets('sensor page shows live health, cleared on disconnect', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await openSensor(h);
+    expect(find.text('Sensor health'), findsOneWidget);
+    expect(find.text('416.125 Hz'), findsOneWidget);
+    expect(find.text('Locked'), findsOneWidget);
+
+    await h.advance(const Duration(seconds: 75));
+    expect(find.text('1 min'), findsOneWidget);
+
+    h.mock.pllLocked = false;
+    await h.advance(const Duration(seconds: 1));
+    expect(find.text('Settling…'), findsOneWidget);
+    expect(find.text('416.000 Hz'), findsOneWidget);
+
+    h.mock.simulateDisconnect();
+    await h.advance(const Duration(milliseconds: 100));
+    expect(find.text('Settling…'), findsNothing);
+    expect(find.text('416.000 Hz'), findsNothing);
   });
 
   testWidgets('sensor page describes the algorithm\'s event data', (

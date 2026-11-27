@@ -28,6 +28,9 @@
 #define IMU_RATE_FILTER_TIME_CONSTANT_MS 100000UL
 #define IMU_SAMPLE_RATE_HZ 416
 
+// Publish the current device health this often.
+#define HEALTH_INTERVAL_MS 1000UL
+
 // ============================================================================
 // Deep sleep. Disabled in DEMO_MODE and SERIAL_REPLAY_MODE.
 // ============================================================================

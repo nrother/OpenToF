@@ -177,6 +177,7 @@ void setup() {
   if (!imuSource.begin()) fatalBlink("IMU init failed");
 #endif
 
+  bleSetHealth(source->health());
   bleStartAdvertising();
 }
 
@@ -191,6 +192,13 @@ void loop() {
   }
 
   if (battery.update(false)) bleSetBatteryLevel(battery.percent());
+
+  static uint32_t lastHealthMs = 0;
+  const uint32_t now = millis();
+  if (now - lastHealthMs >= HEALTH_INTERVAL_MS) {
+    bleSetHealth(source->health());
+    lastHealthMs = now;
+  }
 
   updateStatusLed();
 

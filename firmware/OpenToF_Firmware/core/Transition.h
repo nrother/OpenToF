@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "HealthStatus.h"
+
 enum TransitionType : uint8_t { TRANSITION_TAKEOFF, TRANSITION_LANDING };
 
 // Provisional = fast estimate (sent as early as possible), final = refined estimate
@@ -55,6 +57,9 @@ class TransitionSource {
   virtual ~TransitionSource() {}
   // Returns true and fills `out` if a transition happened. Must not block.
   virtual bool poll(Transition& out) = 0;
+
+  // Sources without a sample clock (demo) report the PLL as unavailable (this is the default value).
+  virtual HealthStatus health() const { return HealthStatus{}; }
 
   // Algorithm description, published over BLE (see JumpDetector.h for the formats).
   virtual const char* name() const { return "unnamed"; }

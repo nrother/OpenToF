@@ -9,7 +9,8 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
 ## Product scope
 
 - Name `OpenToF`; Dart package `opentof_app`; application/bundle ID `com.opentof.app`.
-- Flutter app for **Android 10+ (API 29) and iOS 15+**. English and German (follows the device language). Metric
+- Flutter app for **Android 10+ (API 29) and iOS 15+**. English and German: follows the device language unless set in
+  Settings (System/English/Deutsch, 2026-11-27). In German a routine is called "Übung" (2026-11-27). Metric
   units only. No accounts, no cloud, no history browser.
 - One sensor per app, but device selection stays multi-sensor friendly.
 - **Jump height is shown as "beta"** (h = g·t²/8, g = 9.81 m/s²): it follows from the flight time, but nobody has
@@ -30,7 +31,11 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
   new algorithms can add values without an app update; the app shows whatever the sensor declares.
 - **No replay buffer**: the connection is assumed to stay up; events while disconnected are lost and shown as
   missed. Dropped from the algorithm team's proposal as well: a live-state characteristic (provisional events cover
-  it), device health, a debug stream. Possible later: landing position / landing type as custom fields.
+  it), a debug stream. Possible later: landing position / landing type as custom fields.
+- **Device health has its own Read/Notify characteristic** (2026-11-25): publish PLL lock status and sample
+  frequency and uptime in whole seconds once per second, independently of jumps, with a versioned prefix that
+  allows future health fields.
+  Battery stays on the SIG Battery Level characteristic. This is an optional addition to protocol 2.
 - **Protocol 2 drops the Info characteristic (boot counter, device time) and the sleep command** (2026-11-24). Why:
   removed in the firmware cleanup to keep the firmware small and simple; the features weren't worth their
   complexity. Counted as a protocol change, so app and firmware must match.
@@ -82,14 +87,21 @@ The BLE interface itself is specified in [`PROTOCOL.md`](PROTOCOL.md); this file
 - **Jump display options** (off by default, 2026-09-26): time on bed and total jump time (line under the last jump
   plus table columns); "more jump details" with a checklist of the sensor's values (stored as *hidden* ids, so values
   a new algorithm adds show up by default) and a details sheet when tapping a jump.
+- **Change to the previous jump** (2026-11-25, **on** by default, a Jump display setting): the flight-time difference
+  in ms ("+12 ms", "−8 ms") under the last jump (against the previous plausible jump, routine or not) and as a
+  "Δ" table column (against the previous routine jump; jump #1 against the jump that had landed when Start was
+  pressed, 2026-11-27). Longer is **blue**, shorter **red**, 0 has no
+  color: blue/red instead of green/red so colorblind users can tell them apart. The CSV doesn't include it, since it
+  follows from the flight column.
 
 ## Settings and screens
 
 - **The app always starts on the main screen** (2026-09-22). Without a paired sensor it shows a card that opens
   Settings.
 - Settings: pair/scan, rename and unpair the sensor, routine (timeout 1–30 s, jumps per routine), sounds, chart
-  window, jump display, theme (System/Light/Dark), LED signals, version.
-- **Sensor page** (tap the paired sensor, 2026-09-26): battery and time remaining, device info, protocol version,
+  window, jump display, theme (System/Light/Dark), language, LED signals, version.
+- **Sensor page** (tap the paired sensor, 2026-09-26): battery and time remaining, device health (sample rate,
+  PLL state and time since start, live while connected, 2026-11-27), device info,
   and the detection algorithm's name and declared values.
 - **Version warning** in Settings and on the sensor page when app and firmware MAJOR.MINOR differ; none while the
   firmware version is unknown.

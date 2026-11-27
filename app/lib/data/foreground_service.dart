@@ -57,11 +57,11 @@ class ForegroundService {
   }
 
   /// No BuildContext (or Localizations) exists at this level, so resolve the
-  /// device locale directly, falling back to English.
-  static Future<void> startLocalized() {
+  /// chosen [locale] (or the device locale) directly, falling back to English.
+  static Future<void> startLocalized([Locale? locale]) {
     AppLocalizations l;
     try {
-      l = lookupAppLocalizations(PlatformDispatcher.instance.locale);
+      l = lookupAppLocalizations(locale ?? PlatformDispatcher.instance.locale);
     } catch (_) {
       l = lookupAppLocalizations(const Locale('en'));
     }
@@ -97,7 +97,17 @@ class ForegroundService {
           eventAction: ForegroundTaskEventAction.nothing(),
         ),
       );
-      if (await FlutterForegroundTask.isRunningService) return;
+      if (await FlutterForegroundTask.isRunningService) {
+        // E.g. the app language changed: refresh the texts.
+        await FlutterForegroundTask.updateService(
+          notificationTitle: title,
+          notificationText: text,
+          notificationButtons: [
+            NotificationButton(id: exitButtonId, text: exitButtonText),
+          ],
+        );
+        return;
+      }
       await FlutterForegroundTask.startService(
         serviceId: _serviceId,
         serviceTypes: [ForegroundServiceTypes.connectedDevice],

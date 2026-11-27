@@ -40,7 +40,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get startRoutine => 'Routine starten';
+  String get startRoutine => 'Übung starten';
 
   @override
   String get cancelRoutine => 'Abbrechen';
@@ -50,7 +50,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Start ist möglich, solange du springst: Der Sprung, in dem du gerade bist, zählt als Sprung 1.';
 
   @override
-  String get routineTitle => 'Routine';
+  String get routineTitle => 'Übung';
 
   @override
   String routineRunning(int count, int total) {
@@ -58,13 +58,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get routinePaused => 'Sensor getrennt, Routine pausiert';
+  String get routinePaused => 'Sensor getrennt, Übung pausiert';
 
   @override
-  String get routineComplete => 'Routine abgeschlossen';
+  String get routineComplete => 'Übung abgeschlossen';
 
   @override
-  String get routineCancelledUser => 'Routine abgebrochen';
+  String get routineCancelledUser => 'Übung abgebrochen';
 
   @override
   String get routineCancelledInactivity =>
@@ -102,10 +102,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get chartPaused => 'pausiert';
 
   @override
-  String get chartRoutineStarted => 'Routine gestartet';
+  String get chartRoutineStarted => 'Übung gestartet';
 
   @override
-  String get chartRoutineStopped => 'Routine beendet';
+  String get chartRoutineStopped => 'Übung beendet';
 
   @override
   String get chartImplausibleJump => 'Unplausibler Sprung (ignoriert)';
@@ -125,7 +125,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get export => 'Exportieren';
 
   @override
-  String get exportTooltip => 'Routine als CSV exportieren';
+  String get exportTooltip => 'Übung als CSV exportieren';
 
   @override
   String exportFailed(String message) {
@@ -249,14 +249,14 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get routineSection => 'Routine';
+  String get routineSection => 'Übung';
 
   @override
   String get inactivityTimeout => 'Inaktivitäts-Timeout';
 
   @override
   String get inactivityTimeoutHelp =>
-      'Die Routine wird abgebrochen, wenn in dieser Zeit kein Sprung erkannt wird.';
+      'Die Übung wird abgebrochen, wenn in dieser Zeit kein Sprung erkannt wird.';
 
   @override
   String get feedbackSection => 'Rückmeldung';
@@ -287,11 +287,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get window5m => '5 min';
 
   @override
-  String get jumpsPerRoutine => 'Sprünge pro Routine';
+  String get jumpsPerRoutine => 'Sprünge pro Übung';
 
   @override
   String get jumpsPerRoutineHelp =>
-      'Eine Routine endet nach dieser Anzahl Sprünge. Gilt für die nächste gestartete Routine.';
+      'Eine Übung endet nach dieser Anzahl Sprünge. Gilt für die nächste gestartete Übung.';
 
   @override
   String jumpsPerRoutineInvalid(int min, int max) {
@@ -330,7 +330,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exitConfirmBody =>
-      'Der Sensor wird getrennt, der Hintergrundbetrieb gestoppt und eine laufende Routine abgebrochen. Der Sensor bleibt gekoppelt.';
+      'Der Sensor wird getrennt, der Hintergrundbetrieb gestoppt und eine laufende Übung abgebrochen. Der Sensor bleibt gekoppelt.';
 
   @override
   String get pressBackAgainToExit => 'Zum Beenden erneut Zurück drücken';
@@ -455,10 +455,30 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get showFlightDelta => 'Änderung zum vorherigen Sprung anzeigen';
+
+  @override
+  String get showFlightDeltaHelp =>
+      'Unterschied der Flugzeit in ms (blau = länger, rot = kürzer)';
+
+  @override
+  String get deltaLabel => 'Δ';
+
+  @override
+  String columnMilliseconds(String label) {
+    return '$label (ms)';
+  }
+
+  @override
+  String milliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
   String get exportChooserTitle => 'Als CSV exportieren';
 
   @override
-  String get exportRoutine => 'Aufgezeichnete Routine';
+  String get exportRoutine => 'Aufgezeichnete Übung';
 
   @override
   String exportLastWindow(String window) {
@@ -481,7 +501,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get showJumpDetailsHelp =>
-      'Zusatzwerte des Sensors unter dem letzten Sprung und in der Routine-Tabelle. Sprung antippen für alle Details.';
+      'Zusatzwerte des Sensors unter dem letzten Sprung und in der Übungstabelle. Sprung antippen für alle Details.';
 
   @override
   String get detailsToShow => 'Angezeigte Werte';
@@ -525,7 +545,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledHelpIntro =>
-      'Der Sensor hat ein oranges und ein rotes Licht. Beide sitzen direkt nebeneinander im selben winzigen Bauteil und sind deshalb leicht zu verwechseln. Das orange zeigt, was der Sensor gerade tut, das rote gehört zum Laden. Die Balken unten zeigen jedes Signal über etwa zwei Sekunden: Der farbige Teil bedeutet, das Licht ist an.';
+      'Orange zeigt den Zustand des Sensors, Rot das Laden. Beide sitzen dicht beieinander und sind leicht zu verwechseln. Jeder Balken zeigt etwa 2 s; farbig = an.';
 
   @override
   String get ledOrangeSection => 'Oranges Licht';
@@ -537,8 +557,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get ledWaitingTiming => '0,3 s an, 0,7 s aus, fortlaufend';
 
   @override
-  String get ledWaitingMeaning =>
-      'Der Sensor ist wach und wartet auf die App. Die App verbindet sich von selbst, sobald der Sensor gekoppelt ist.';
+  String get ledWaitingMeaning => 'Wach, wartet auf die App.';
 
   @override
   String get ledConnectedTitle => 'Dauerhaft an';
@@ -547,8 +566,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get ledConnectedTiming => 'Dauerlicht';
 
   @override
-  String get ledConnectedMeaning =>
-      'Die App ist verbunden. Solange die Verbindung besteht, schläft der Sensor nicht ein.';
+  String get ledConnectedMeaning => 'Mit der App verbunden.';
 
   @override
   String get ledGoingToSleepTitle => '6-mal schnelles Blinken, dann aus';
@@ -558,7 +576,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledGoingToSleepMeaning =>
-      'Der Sensor schläft ein, um Akku zu sparen. Das passiert nach 1 Minute ohne verbundene App und ohne Sprung.';
+      'Schläft ein nach 1 min ohne App und ohne Sprung.';
 
   @override
   String get ledAsleepTitle => 'Aus';
@@ -568,7 +586,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledAsleepMeaning =>
-      'Der Sensor schläft und die App findet ihn nicht. Sensor schütteln oder anstoßen, um ihn aufzuwecken: Er reagiert innerhalb von etwa 4 Sekunden. Passiert nichts, ist möglicherweise der Akku leer.';
+      'Schläft oder Akku leer. Zum Aufwecken schütteln (dauert bis zu 4 s).';
 
   @override
   String get ledWokeUpTitle => '3-mal kurzes Blinken, dann langsames Blinken';
@@ -577,8 +595,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get ledWokeUpTiming => '0,08 s an, 0,08 s aus, 3-mal';
 
   @override
-  String get ledWokeUpMeaning =>
-      'Der Sensor hat die Bewegung bemerkt und ist aufgewacht. Er wartet jetzt auf die App.';
+  String get ledWokeUpMeaning => 'Durch Bewegung aufgewacht.';
 
   @override
   String get ledErrorTitle => 'Schnelles Blinken ohne Ende';
@@ -588,14 +605,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledErrorMeaning =>
-      'Der Sensor konnte nicht starten und funktioniert nicht. Reset-Taste am Sensor drücken oder die Stromversorgung trennen und wieder verbinden.';
+      'Start fehlgeschlagen. Reset drücken oder Strom kurz trennen.';
 
   @override
   String get ledRedSection => 'Rotes Licht (Laden)';
 
   @override
-  String get ledRedBody =>
-      'Das rote Licht gehört zum Ladechip, nicht zur Sensor-Software. Es funktioniert nur, solange der Sensor per USB angeschlossen ist: Im Akkubetrieb ist es immer aus. Über die Verbindung zur App sagt es nichts aus.';
+  String get ledRedBody => 'Leuchtet nur, solange USB angeschlossen ist.';
 
   @override
   String get ledChargingTitle => 'Kurzes Aufblitzen etwa einmal pro Sekunde';
@@ -605,7 +621,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledChargingMeaning =>
-      'Der Akku wird geladen. Der letzte Teil des Ladens geht langsam: Das Licht kann noch eine halbe Stunde oder länger blitzen, während die App schon über 90 % anzeigt.';
+      'Lädt. Die letzten 10 % können noch 30 min oder länger dauern.';
 
   @override
   String get ledChargedTitle => 'Knapp eine Minute an, dann aus';
@@ -614,8 +630,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get ledChargedTiming => 'Dauerlicht für etwa 50 s';
 
   @override
-  String get ledChargedMeaning =>
-      'Der Akku ist voll. Danach bleibt das Licht aus, obwohl USB weiter angeschlossen ist.';
+  String get ledChargedMeaning => 'Voll geladen.';
 
   @override
   String get ledChargeOffTitle => 'Aus trotz USB-Anschluss';
@@ -625,11 +640,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ledChargeOffMeaning =>
-      'Meistens ist der Akku voll. Wurde der Sensor gerade erst angeschlossen und das rote Licht ging gar nicht an, Kabel und Stromquelle prüfen. Später kann das Licht wieder blitzen, wenn der Ladechip den Akku nachlädt.';
+      'Meist voll. Ging es nie an, Kabel und Stromquelle prüfen.';
 
   @override
   String get ledRedSource =>
-      'Diese Signale stammen aus dem Datenblatt des Ladechips. An unseren eigenen Sensoren wurde bisher nur das Blitzen beim Laden beobachtet, die beiden anderen können also leicht abweichen. Die App kann nicht anzeigen, ob der Sensor lädt, weil die Sensor-Software dieses Licht nicht auslesen kann.';
+      'Laut Datenblatt des Ladechips; an echten Sensoren ist bisher nur das Blitzen beim Laden bestätigt.';
 
   @override
   String get simRestart => 'Sensor-Neustart simulieren';
@@ -656,4 +671,36 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get changelogLoadFailed =>
       'Die Änderungen konnten nicht geladen werden.';
+
+  @override
+  String get language => 'Sprache';
+
+  @override
+  String get languageSystem => 'System';
+
+  @override
+  String get healthSection => 'Sensorzustand';
+
+  @override
+  String get sampleRateLabel => 'Abtastrate';
+
+  @override
+  String hertz(String value) {
+    return '$value Hz';
+  }
+
+  @override
+  String get pllLabel => 'Abtasttakt (PLL)';
+
+  @override
+  String get pllLocked => 'Eingerastet';
+
+  @override
+  String get pllAcquiring => 'Stellt sich ein…';
+
+  @override
+  String get pllNotAvailable => 'Nicht verfügbar';
+
+  @override
+  String get uptimeLabel => 'Zeit seit dem Start';
 }

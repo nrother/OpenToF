@@ -35,6 +35,9 @@ class MainScreen extends ConsumerWidget {
     final showTotal = ref.watch(
       settingsProvider.select((s) => s.showTotalTime),
     );
+    final showDelta = ref.watch(
+      settingsProvider.select((s) => s.showFlightDelta),
+    );
     final settings = ref.watch(settingsProvider);
     final detailsOn = settings.showJumpDetails;
     final algorithm = ref.watch(sessionProvider.select((s) => s.algorithm));
@@ -86,6 +89,7 @@ class MainScreen extends ConsumerWidget {
                 routine: routine,
                 showContact: showContact,
                 showTotal: showTotal,
+                showDelta: showDelta,
                 details: details,
                 onJumpTap: detailsOn
                     ? (j) => showJumpDetailsSheet(context, j, algorithm)
@@ -206,6 +210,15 @@ class _LastJumpCard extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final Jump? jump = ref.watch(sessionProvider.select((s) => s.lastJump));
+    final Jump? previous = ref.watch(
+      sessionProvider.select((s) => s.previousJump),
+    );
+    final showDelta = ref.watch(
+      settingsProvider.select((s) => s.showFlightDelta),
+    );
+    final deltaMs = showDelta && jump != null && previous != null
+        ? jump.flightMs - previous.flightMs
+        : null;
     final showContact = ref.watch(
       settingsProvider.select((s) => s.showContactTime),
     );
@@ -255,6 +268,15 @@ class _LastJumpCard extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (deltaMs != null)
+                Text(
+                  '${l.deltaLabel} ${l.milliseconds(formatDeltaMs(deltaMs))}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: deltaColor(context, deltaMs),
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               if (times.isNotEmpty)
                 Text(
                   times.join('   '),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../domain/sensor_events.dart';
+import '../../domain/sensor_health.dart';
 
 /// The single home of all BLE UUIDs and payload byte layouts. Must match
 /// `firmware/OpenToF_Firmware/config/BleUuids.h`.
@@ -18,6 +19,8 @@ import '../../domain/sensor_events.dart';
 ///  - Reasons          (Read): JSON array naming the reason bits
 ///  - Confidence kind  (Read): "none" | "heuristic" | "calibrated"
 ///  - Name             (Read/Write): UTF-8 string
+///  - Health           (Read/Notify): version u8, flags u8, PLL frequency u32 mHz
+///                     followed by uptime u32 seconds
 
 class BleProtocol {
   BleProtocol._();
@@ -34,6 +37,7 @@ class BleProtocol {
   static const reasonsCharacteristic = '6f70656e-546f-4600-0008-000000000000';
   static const confidenceKindCharacteristic =
       '6f70656e-546f-4600-0009-000000000000';
+  static const healthCharacteristic = '6f70656e-546f-4600-000b-000000000000';
 
   // Standard Bluetooth SIG Battery Service / Battery Level.
   static const batteryService = '180f';
@@ -111,6 +115,21 @@ class BleProtocol {
     if (data.isEmpty) return null;
     final level = data[0];
     return level <= 100 ? level : null;
+  }
+
+  /// Accept appended fields and unknown flag bits for future health additions.
+  /// A changed prefix layout requires a new health version.
+  static SensorHealth? parseHealth(List<int> data) {
+    if (data.length < 6 || data[0] != 1) return null;
+    if (data.length > 6 && data.length < 10) return null;
+    final b = ByteData.sublistView(Uint8List.fromList(data));
+    final flags = b.getUint8(1);
+    final available = (flags & 1) != 0;
+    return SensorHealth(
+      pllLocked: available ? (flags & 2) != 0 : null,
+      pllFrequencyHz: available ? b.getUint32(2, Endian.little) / 1000.0 : null,
+      uptimeSeconds: data.length >= 10 ? b.getUint32(6, Endian.little) : null,
+    );
   }
 
   static String? parseName(List<int> data) => parseUtf8String(data);
