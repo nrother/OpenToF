@@ -10,6 +10,7 @@ import '../domain/jump.dart';
 import '../domain/jump_assembler.dart';
 import '../domain/routine.dart';
 import '../domain/sensor_events.dart';
+import '../domain/sensor_health.dart';
 import 'providers.dart';
 
 class SessionState {
@@ -26,6 +27,7 @@ class SessionState {
     this.chartFrozenAt,
     this.algorithm = AlgorithmMetadata.none,
     this.protocolMismatch = false,
+    this.health,
   });
 
   final SensorConnectionState connection;
@@ -35,6 +37,16 @@ class SessionState {
 
   /// Recent jumps for the rolling chart (pruned to [SessionController.maxHistory]).
   final List<Jump> history;
+
+  /// The plausible jump before [lastJump] (for the flight-time change), or
+  /// null if there is none in [history].
+  Jump? get previousJump {
+    final last = lastJump;
+    if (last == null) return null;
+    final i = history.lastIndexWhere((j) => j.serial == last.serial);
+    return i > 0 ? history[i - 1] : null;
+  }
+
   final RoutineState routine;
   final String? deviceName;
 
@@ -55,6 +67,10 @@ class SessionState {
   /// not understand. Cleared on disconnect or when a supported event arrives.
   final bool protocolMismatch;
 
+  /// Latest device health while connected; null otherwise (or if the
+  /// firmware does not publish it).
+  final SensorHealth? health;
+
   SessionState copyWith({
     SensorConnectionState? connection,
     int? batteryLevel,
@@ -70,6 +86,8 @@ class SessionState {
     bool clearChartFrozen = false,
     AlgorithmMetadata? algorithm,
     bool? protocolMismatch,
+    SensorHealth? health,
+    bool clearHealth = false,
   }) => SessionState(
     connection: connection ?? this.connection,
     batteryLevel: batteryLevel ?? this.batteryLevel,
@@ -85,6 +103,7 @@ class SessionState {
         : (chartFrozenAt ?? this.chartFrozenAt),
     algorithm: algorithm ?? this.algorithm,
     protocolMismatch: protocolMismatch ?? this.protocolMismatch,
+    health: clearHealth ? null : (health ?? this.health),
   );
 }
 
@@ -138,6 +157,7 @@ class SessionController extends Notifier<SessionState> {
       ..add(sensor.connectionState.listen(_onConnection))
       ..add(sensor.events.listen(_onSensorEvent))
       ..add(sensor.batteryLevel.listen(_onBattery))
+      ..add(sensor.health.listen((h) => state = state.copyWith(health: h)))
       ..add(
         sensor.unsupportedProtocol.listen(
           (_) => state = state.copyWith(protocolMismatch: true),
@@ -174,6 +194,7 @@ class SessionController extends Notifier<SessionState> {
       routine: _machine.state,
       events: _withConnectionEvent(c),
       protocolMismatch: connected ? null : false,
+      clearHealth: !connected,
     );
     if (connected) {
       unawaited(_refreshName());

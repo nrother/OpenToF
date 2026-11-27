@@ -9,13 +9,25 @@ firmware 0.4.x, and older firmware (≤ 0.3.2) no longer works with the new app 
 
 For the reasoning behind individual choices see `docs/DECISIONS.md`; this file only says what changed.
 
-## 0.7.1 — unreleased (2026-11-25)
+## 0.7.1 — unreleased (2026-11-27)
 
-**Firmware 0.7.1**; the app stays at 0.7.0 (same protocol 2).
+**Firmware 0.7.1** (same protocol 2); the app version is not bumped yet.
 
 ### Sensor firmware
 - **Faster `TofNetJumpDetector`:** it now needs about 23 % of the processor time instead of about 83 %, also
   with the app connected, so it keeps up with all 416 samples per second. It detects the same jumps as before.
+- **New: device health.** Once per second the sensor reports its sample rate, whether its sample clock (PLL) has
+  locked, and the time since it started.
+
+### App
+- **New: sensor health** on the sensor page: sample rate, PLL state and time since start, live while connected.
+  Older firmware shows "–".
+- **New: language setting** under Appearance (System / English / Deutsch). The background notification
+  follows it too.
+- **New: change to the previous jump** in ms ("+12 ms", "−8 ms") under the last jump and as a "Δ" column in the
+  routine table. Longer is blue, shorter red. On by default; switch it off under Jump display.
+- **Changed:** in German a routine is now called "Übung".
+- **Changed:** shorter texts on the LED signals page.
 
 ## 0.7.0 — unreleased (2026-11-24)
 

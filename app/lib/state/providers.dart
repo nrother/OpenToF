@@ -69,8 +69,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
   );
   void setUseMockSensor(bool v) => _set(state.copyWith(useMockSensor: v));
   void setThemeMode(AppThemeMode v) => _set(state.copyWith(themeMode: v));
+  void setLanguage(AppLanguage v) => _set(state.copyWith(language: v));
   void setShowContactTime(bool v) => _set(state.copyWith(showContactTime: v));
   void setShowTotalTime(bool v) => _set(state.copyWith(showTotalTime: v));
+  void setShowFlightDelta(bool v) => _set(state.copyWith(showFlightDelta: v));
   void setShowJumpDetails(bool v) => _set(state.copyWith(showJumpDetails: v));
   void setDetailVisible(String key, bool visible) => _set(
     state.copyWith(
@@ -126,8 +128,9 @@ final foregroundServiceProvider = Provider<void>((ref) {
     ForegroundService.listenForExit(() => ref.read(exitAppProvider)()),
   );
   final paired = ref.watch(settingsProvider.select((s) => s.isPaired));
+  final language = ref.watch(settingsProvider.select((s) => s.language));
   if (paired) {
-    ForegroundService.startLocalized();
+    ForegroundService.startLocalized(language.locale);
   } else {
     ForegroundService.stop();
   }

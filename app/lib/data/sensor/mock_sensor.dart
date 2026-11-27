@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import '../../domain/algorithm_metadata.dart';
 import '../../domain/sensor_events.dart';
+import '../../domain/sensor_health.dart';
 import 'sensor.dart';
 
 /// Debug-only simulated sensor. Never selected in release builds.
@@ -39,12 +40,16 @@ class MockSensor implements Sensor {
 
   final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
+  final _health = StreamController<SensorHealth>.broadcast();
   final _unsupported = StreamController<int>.broadcast();
   final _state = StreamController<SensorConnectionState>.broadcast();
 
   SensorConnectionState _current = SensorConnectionState.disconnected;
   bool _wantConnected = false;
   int _batteryLevel = 100;
+
+  /// Simulated PLL state (the real one locks within seconds of boot).
+  bool pllLocked = true;
 
   // Device-side jump bookkeeping (like the firmware's JumpEventPublisher).
   int _jumpId = 0;
@@ -60,6 +65,8 @@ class MockSensor implements Sensor {
   Stream<JumpEvent> get events => _events.stream;
   @override
   Stream<int> get batteryLevel => _battery.stream;
+  @override
+  Stream<SensorHealth> get health => _health.stream;
   @override
   Stream<int> get unsupportedProtocol => _unsupported.stream;
   @override
@@ -83,9 +90,27 @@ class MockSensor implements Sensor {
         _battery.add(_batteryLevel);
       }
     });
+    _emitHealth();
+    _healthTimer ??= Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _emitHealth(),
+    );
   }
 
   Timer? _batteryTimer;
+  Timer? _healthTimer;
+
+  /// Like the firmware: 416 Hz nominal, uptime counted from the last (re)boot.
+  void _emitHealth() {
+    if (_current != SensorConnectionState.connected) return;
+    _health.add(
+      SensorHealth(
+        pllLocked: pllLocked,
+        pllFrequencyHz: pllLocked ? 416.125 : 416,
+        uptimeSeconds: _clock().difference(_epoch).inSeconds,
+      ),
+    );
+  }
 
   @override
   Future<void> disconnect() async {
@@ -93,6 +118,8 @@ class MockSensor implements Sensor {
     stopBouncing();
     _batteryTimer?.cancel();
     _batteryTimer = null;
+    _healthTimer?.cancel();
+    _healthTimer = null;
     _setState(SensorConnectionState.disconnected);
   }
 
@@ -297,6 +324,7 @@ class MockSensor implements Sensor {
     if (!_wantConnected) return;
     _setState(SensorConnectionState.connected);
     _battery.add(_batteryLevel);
+    _emitHealth();
   }
 
   /// Simulates an event from firmware speaking another protocol version
@@ -338,6 +366,7 @@ class MockSensor implements Sensor {
     await disconnect();
     await _events.close();
     await _battery.close();
+    await _health.close();
     await _unsupported.close();
     await _state.close();
   }

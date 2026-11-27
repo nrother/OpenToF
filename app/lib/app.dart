@@ -21,6 +21,7 @@ class OpenToFApp extends ConsumerWidget {
     // Android: keeps the BLE connection alive in the background while paired.
     ref.watch(foregroundServiceProvider);
     final themeMode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    final language = ref.watch(settingsProvider.select((s) => s.language));
 
     return MaterialApp(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
@@ -42,6 +43,7 @@ class OpenToFApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
+      locale: language.locale,
       themeMode: switch (themeMode) {
         AppThemeMode.system => ThemeMode.system,
         AppThemeMode.light => ThemeMode.light,

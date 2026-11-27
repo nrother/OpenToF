@@ -11,6 +11,7 @@ class RoutineState {
     this.paused = false,
     this.cancelReason,
     this.targetJumps = RoutineMachine.defaultJumpsPerRoutine,
+    this.jumpBeforeStart,
   });
 
   static const idle = RoutineState();
@@ -24,6 +25,15 @@ class RoutineState {
 
   /// Jump count this routine ends at (fixed when it was started).
   final int targetJumps;
+
+  /// The jump that had landed when Start was pressed (not part of the
+  /// routine); jump #1's flight-time change is measured against it.
+  final Jump? jumpBeforeStart;
+
+  /// The jump [index] is compared with: the routine jump before it, or
+  /// [jumpBeforeStart] for jump #1.
+  Jump? previousOf(int index) =>
+      index == 0 ? jumpBeforeStart : jumps[index - 1];
 
   int get totalFlightMs => jumps.fold(0, (sum, j) => sum + j.flightMs);
   double get totalFlightSeconds => totalFlightMs / 1000.0;
@@ -39,12 +49,17 @@ class RoutineState {
     List<Jump>? jumps,
     bool? paused,
     CancelReason? cancelReason,
+    Jump? jumpBeforeStart,
+    bool clearJumpBeforeStart = false,
   }) => RoutineState(
     phase: phase ?? this.phase,
     jumps: jumps ?? this.jumps,
     paused: paused ?? this.paused,
     cancelReason: cancelReason ?? this.cancelReason,
     targetJumps: targetJumps,
+    jumpBeforeStart: clearJumpBeforeStart
+        ? null
+        : (jumpBeforeStart ?? this.jumpBeforeStart),
   );
 }
 
@@ -94,6 +109,7 @@ class RoutineMachine {
     _state = RoutineState(
       phase: RoutinePhase.running,
       targetJumps: jumpsPerRoutine,
+      jumpBeforeStart: lastJump,
     );
     return true;
   }
@@ -108,6 +124,7 @@ class RoutineMachine {
         phase: RoutinePhase.complete,
         jumps: jumps,
         targetJumps: _state.targetJumps,
+        jumpBeforeStart: _state.jumpBeforeStart,
       );
     } else {
       _deadline = jump.landedAt.add(_timeout);
@@ -119,6 +136,9 @@ class RoutineMachine {
   /// sensor's final estimate. Works in every phase so a finished routine's
   /// table and total show the final values too.
   void replaceJump(Jump jump) {
+    if (_state.jumpBeforeStart?.serial == jump.serial) {
+      _state = _state.copyWith(jumpBeforeStart: jump);
+    }
     final i = _state.jumps.indexWhere((j) => j.serial == jump.serial);
     if (i < 0) return;
     final jumps = [..._state.jumps]..[i] = jump;
@@ -129,6 +149,9 @@ class RoutineMachine {
   /// deadline then runs from the remaining last jump (or from Start).
   void removeJump(int serial) {
     if (_state.phase != RoutinePhase.running) return;
+    if (_state.jumpBeforeStart?.serial == serial) {
+      _state = _state.copyWith(clearJumpBeforeStart: true);
+    }
     final i = _state.jumps.indexWhere((j) => j.serial == serial);
     if (i < 0) return;
     final jumps = [..._state.jumps]..removeAt(i);
@@ -161,6 +184,7 @@ class RoutineMachine {
       jumps: _state.jumps,
       cancelReason: reason,
       targetJumps: _state.targetJumps,
+      jumpBeforeStart: _state.jumpBeforeStart,
     );
   }
 }

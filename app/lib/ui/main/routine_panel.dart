@@ -17,6 +17,7 @@ class RoutinePanel extends StatelessWidget {
     required this.routine,
     this.showContact = false,
     this.showTotal = false,
+    this.showDelta = false,
     this.details = const [],
     this.onJumpTap,
   });
@@ -24,6 +25,10 @@ class RoutinePanel extends StatelessWidget {
   final RoutineState routine;
   final bool showContact;
   final bool showTotal;
+
+  /// Flight-time change to the previous jump (for #1: the one before Start),
+  /// in ms.
+  final bool showDelta;
   final List<JumpDetail> details;
 
   /// Tapping a filled row calls this (e.g. to show the jump's details).
@@ -34,7 +39,11 @@ class RoutinePanel extends StatelessWidget {
   bool get _compact => showContact || showTotal || details.isNotEmpty;
 
   int get _columns =>
-      3 + (showContact ? 1 : 0) + (showTotal ? 1 : 0) + details.length;
+      3 +
+      (showContact ? 1 : 0) +
+      (showTotal ? 1 : 0) +
+      (showDelta ? 1 : 0) +
+      details.length;
 
   /// Seconds cell text: with unit normally, bare number in compact mode.
   String _secs(BuildContext context, AppLocalizations l, double? v) {
@@ -108,6 +117,12 @@ class RoutinePanel extends StatelessWidget {
           style: headerStyle,
           textAlign: TextAlign.end,
         ),
+        if (showDelta)
+          Text(
+            _compact ? l.columnMilliseconds(l.deltaLabel) : l.deltaLabel,
+            style: headerStyle,
+            textAlign: TextAlign.end,
+          ),
         if (showContact)
           Text(
             _secsHeader(l, l.contactLabel),
@@ -141,6 +156,7 @@ class RoutinePanel extends StatelessWidget {
           style: mono?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.end,
         ),
+        if (showDelta) const SizedBox.shrink(),
         if (showContact) const SizedBox.shrink(),
         if (showTotal) const SizedBox.shrink(),
         const SizedBox.shrink(),
@@ -204,6 +220,7 @@ class RoutinePanel extends StatelessWidget {
   ) {
     final scheme = Theme.of(context).colorScheme;
     final jump = index < routine.jumps.length ? routine.jumps[index] : null;
+    final previous = jump == null ? null : routine.previousOf(index);
     final isNext =
         routine.phase == RoutinePhase.running && index == routine.jumps.length;
     final dim = mono?.copyWith(color: scheme.outline);
@@ -250,6 +267,7 @@ class RoutinePanel extends StatelessWidget {
           style: jump == null ? dim : mono,
           textAlign: TextAlign.end,
         ),
+        if (showDelta) _delta(context, l, jump, previous),
         if (showContact) _optional(context, l, jump?.contactSeconds),
         if (showTotal) _optional(context, l, jump?.totalSeconds),
         Text(
@@ -270,6 +288,34 @@ class RoutinePanel extends StatelessWidget {
           ? scheme.primaryContainer.withValues(alpha: 0.5)
           : null,
       onTap: jump == null || onJumpTap == null ? null : () => onJumpTap!(jump),
+    );
+  }
+
+  /// Signed flight-time change to [previous] in ms; "–" for empty rows and a
+  /// jump #1 without a jump before Start.
+  Widget _delta(
+    BuildContext context,
+    AppLocalizations l,
+    Jump? jump,
+    Jump? previous,
+  ) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodyLarge?.copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    if (jump == null || previous == null) {
+      return Text(
+        '–',
+        style: style?.copyWith(color: theme.colorScheme.outline),
+        textAlign: TextAlign.end,
+      );
+    }
+    final ms = jump.flightMs - previous.flightMs;
+    final text = formatDeltaMs(ms);
+    return Text(
+      _compact ? text : l.milliseconds(text),
+      style: style?.copyWith(color: deltaColor(context, ms)),
+      textAlign: TextAlign.end,
     );
   }
 

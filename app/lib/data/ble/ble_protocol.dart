@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../domain/sensor_events.dart';
+import '../../domain/sensor_health.dart';
 
 /// The single home of all BLE UUIDs and payload byte layouts. Must match
 /// `firmware/OpenToF_Firmware/config/BleUuids.h`.
@@ -141,19 +142,4 @@ class BleProtocol {
   }
 
   static List<int> encodeName(String name) => utf8.encode(name);
-}
-
-class SensorHealth {
-  const SensorHealth({
-    required this.pllLocked,
-    required this.pllFrequencyHz,
-    this.uptimeSeconds,
-  });
-
-  /// Both fields are null when this source has no PLL (demo mode).
-  final bool? pllLocked;
-  final double? pllFrequencyHz;
-
-  /// Whole seconds since boot; null for older six-byte health payloads.
-  final int? uptimeSeconds;
 }

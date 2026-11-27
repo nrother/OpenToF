@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../domain/algorithm_metadata.dart';
 import '../../domain/sensor_events.dart';
+import '../../domain/sensor_health.dart';
 import '../sensor/sensor.dart';
 import 'ble_protocol.dart';
 
@@ -119,6 +120,7 @@ class BleSensor implements Sensor {
 
   final _events = StreamController<JumpEvent>.broadcast();
   final _battery = StreamController<int>.broadcast();
+  final _health = StreamController<SensorHealth>.broadcast();
   final _unsupported = StreamController<int>.broadcast();
   final _state = StreamController<SensorConnectionState>.broadcast();
 
@@ -134,6 +136,8 @@ class BleSensor implements Sensor {
   Stream<JumpEvent> get events => _events.stream;
   @override
   Stream<int> get batteryLevel => _battery.stream;
+  @override
+  Stream<SensorHealth> get health => _health.stream;
   @override
   Stream<int> get unsupportedProtocol => _unsupported.stream;
   @override
@@ -237,6 +241,27 @@ class BleSensor implements Sensor {
       await battery.setNotifyValue(true);
       final level = BleProtocol.parseBattery(await battery.read());
       if (level != null) _battery.add(level);
+    }
+
+    // Optional (older firmware lacks it): never let it break the connection.
+    final health = find(
+      BleProtocol.jumpService,
+      BleProtocol.healthCharacteristic,
+    );
+    if (health != null) {
+      try {
+        _charSubs.add(
+          health.onValueReceived.listen((v) {
+            final h = BleProtocol.parseHealth(v);
+            if (h != null) _health.add(h);
+          }),
+        );
+        await health.setNotifyValue(true);
+        final h = BleProtocol.parseHealth(await health.read());
+        if (h != null) _health.add(h);
+      } catch (e) {
+        debugPrint('Health characteristic unavailable: $e');
+      }
     }
   }
 
@@ -352,6 +377,7 @@ class BleSensor implements Sensor {
     await disconnect();
     await _events.close();
     await _battery.close();
+    await _health.close();
     await _unsupported.close();
     await _state.close();
   }

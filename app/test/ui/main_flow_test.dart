@@ -218,6 +218,41 @@ void main() {
     expect(find.text('1.300'), findsOneWidget); // table cell, unit in header
   });
 
+  testWidgets('change to the previous jump shows in ms (on by default)', (
+    tester,
+  ) async {
+    final h = await AppHarness.launch(tester);
+    await h.jump(flightMs: 1000); // nothing to compare with yet
+    expect(find.textContaining('Δ'), findsNothing);
+    await h.jump(flightMs: 1100);
+    expect(find.text('Δ +100 ms'), findsOneWidget);
+    await h.jump(flightMs: 1050);
+    expect(find.text('Δ −50 ms'), findsOneWidget);
+
+    await tester.tap(h.startButton);
+    await tester.pump();
+    await h.jump(flightMs: 1200); // #1: compared with the jump before Start
+    expect(find.text('+150 ms'), findsOneWidget); // table row 1
+    await h.jump(flightMs: 1188);
+    expect(find.text('Δ'), findsOneWidget); // table header
+    expect(find.text('+150 ms'), findsOneWidget); // row 1 unchanged
+    expect(find.text('−12 ms'), findsOneWidget); // table row 2
+    expect(find.text('Δ −12 ms'), findsOneWidget); // last-jump card
+  });
+
+  testWidgets('change to the previous jump can be turned off', (tester) async {
+    final h = await AppHarness.launch(
+      tester,
+      prefs: {'show_flight_delta': false},
+    );
+    await h.jump(flightMs: 1000);
+    await h.jump(flightMs: 1100);
+    await tester.tap(h.startButton);
+    await tester.pump();
+    await h.jump(flightMs: 1200);
+    expect(find.textContaining('Δ'), findsNothing);
+  });
+
   testWidgets('all table columns fit a narrow phone (German)', (tester) async {
     tester.platformDispatcher.localesTestValue = const [Locale('de')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -228,7 +263,7 @@ void main() {
     tester.view.physicalSize = const Size(360, 3000);
     await h.jump(flightMs: 2345);
     await h.jump(flightMs: 2345);
-    await tester.tap(find.text('Routine starten'));
+    await tester.tap(find.text('Übung starten'));
     await tester.pump();
     for (var i = 0; i < 9; i++) {
       await h.jump(flightMs: 2345);

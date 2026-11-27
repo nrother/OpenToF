@@ -20,7 +20,17 @@ void main() {
     expect(demo.pllLocked, isNull);
     expect(demo.pllFrequencyHz, isNull);
     final extended = BleProtocol.parseHealth([
-      1, 0x83, 0x7D, 0x59, 6, 0, 0x78, 0x56, 0x34, 0x12, 42,
+      1,
+      0x83,
+      0x7D,
+      0x59,
+      6,
+      0,
+      0x78,
+      0x56,
+      0x34,
+      0x12,
+      42,
     ])!;
     expect(extended.pllLocked, isTrue);
     expect(extended.pllFrequencyHz, 416.125);
@@ -31,14 +41,29 @@ void main() {
   });
 
   test('uptime is available without a PLL and rejects truncated values', () {
-    expect(BleProtocol.parseHealth([1, 0, 0, 0, 0, 0, 0, 0, 0, 0])!.uptimeSeconds, 0);
+    expect(
+      BleProtocol.parseHealth([1, 0, 0, 0, 0, 0, 0, 0, 0, 0])!.uptimeSeconds,
+      0,
+    );
     final max = BleProtocol.parseHealth([
-      1, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
     ])!;
     expect(max.uptimeSeconds, 0xFFFFFFFF);
     expect(max.pllLocked, isNull);
     for (var length = 7; length < 10; length++) {
-      expect(BleProtocol.parseHealth([1, ...List.filled(length - 1, 0)]), isNull);
+      expect(
+        BleProtocol.parseHealth([1, ...List.filled(length - 1, 0)]),
+        isNull,
+      );
     }
   });
 

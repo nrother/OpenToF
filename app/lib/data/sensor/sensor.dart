@@ -1,5 +1,6 @@
 import '../../domain/algorithm_metadata.dart';
 import '../../domain/sensor_events.dart';
+import '../../domain/sensor_health.dart';
 
 enum SensorConnectionState { disconnected, connecting, connected }
 
@@ -61,6 +62,10 @@ abstract class Sensor {
 
   /// Battery level in percent (0-100).
   Stream<int> get batteryLevel;
+
+  /// Device health (sample rate, PLL lock, uptime), about once per second.
+  /// Silent for firmware without the Health characteristic.
+  Stream<SensorHealth> get health;
 
   /// Emits the protocol byte of every event the sensor sent with a protocol
   /// version this app does not understand (such events are dropped).

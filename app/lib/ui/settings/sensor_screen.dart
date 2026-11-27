@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/algorithm_metadata.dart';
+import '../../domain/sensor_health.dart';
 import '../../domain/version_check.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
@@ -19,6 +20,7 @@ class SensorScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final info = session.deviceInfo;
     final algorithm = session.algorithm;
+    final health = session.health;
 
     return Scaffold(
       appBar: AppBar(
@@ -45,6 +47,21 @@ class SensorScreen extends ConsumerWidget {
               session.batteryRemaining == null
                   ? l.batteryRemainingUnknown
                   : formatRemaining(l, session.batteryRemaining!),
+            ),
+
+            SettingsSection(l.healthSection),
+            InfoRow(
+              l.sampleRateLabel,
+              health?.pllFrequencyHz == null
+                  ? null
+                  : formatHertz(context, health!.pllFrequencyHz!),
+            ),
+            InfoRow(l.pllLabel, _pllState(l, health)),
+            InfoRow(
+              l.uptimeLabel,
+              health?.uptimeSeconds == null
+                  ? null
+                  : formatUptime(l, health!.uptimeSeconds!),
             ),
 
             SettingsSection(l.deviceInfoSection),
@@ -85,6 +102,17 @@ class SensorScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Null ('–') while no health has arrived; a sensor without a PLL (demo
+  /// mode) reports it as not available.
+  static String? _pllState(AppLocalizations l, SensorHealth? health) {
+    if (health == null) return null;
+    return switch (health.pllLocked) {
+      true => l.pllLocked,
+      false => l.pllAcquiring,
+      null => l.pllNotAvailable,
+    };
   }
 
   static String _confidenceKind(AppLocalizations l, String kind) =>

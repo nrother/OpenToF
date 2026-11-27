@@ -1,9 +1,21 @@
+import 'dart:ui' show Locale;
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/routine.dart';
 
 /// User choice for light/dark appearance (system = follow the device).
 enum AppThemeMode { system, light, dark }
+
+/// App language (system = follow the device, English if it is neither).
+enum AppLanguage {
+  system,
+  en,
+  de;
+
+  /// Locale to force, or null to follow the device.
+  Locale? get locale => this == system ? null : Locale(name);
+}
 
 class AppSettings {
   const AppSettings({
@@ -16,8 +28,10 @@ class AppSettings {
     this.pairedDeviceName,
     this.useMockSensor = false,
     this.themeMode = AppThemeMode.system,
+    this.language = AppLanguage.system,
     this.showContactTime = false,
     this.showTotalTime = false,
+    this.showFlightDelta = true,
     this.showJumpDetails = false,
     this.hiddenDetails = const [],
   });
@@ -55,11 +69,16 @@ class AppSettings {
 
   final AppThemeMode themeMode;
 
+  final AppLanguage language;
+
   /// Show the time on the bed before each jump next to its flight time.
   final bool showContactTime;
 
   /// Show each jump's total time (time on the bed + flight time).
   final bool showTotalTime;
+
+  /// Show the flight-time change to the previous jump (in ms).
+  final bool showFlightDelta;
 
   /// Show the sensor's extra per-jump information (confidence, custom values)
   /// under the last jump and in the routine table, and a details sheet on tap.
@@ -84,8 +103,10 @@ class AppSettings {
     int? jumpsPerRoutine,
     bool? useMockSensor,
     AppThemeMode? themeMode,
+    AppLanguage? language,
     bool? showContactTime,
     bool? showTotalTime,
+    bool? showFlightDelta,
     bool? showJumpDetails,
     List<String>? hiddenDetails,
   }) => AppSettings(
@@ -99,8 +120,10 @@ class AppSettings {
     pairedDeviceName: pairedDeviceName,
     useMockSensor: useMockSensor ?? this.useMockSensor,
     themeMode: themeMode ?? this.themeMode,
+    language: language ?? this.language,
     showContactTime: showContactTime ?? this.showContactTime,
     showTotalTime: showTotalTime ?? this.showTotalTime,
+    showFlightDelta: showFlightDelta ?? this.showFlightDelta,
     showJumpDetails: showJumpDetails ?? this.showJumpDetails,
     hiddenDetails: hiddenDetails ?? this.hiddenDetails,
   );
@@ -115,8 +138,10 @@ class AppSettings {
     pairedDeviceName: name,
     useMockSensor: useMockSensor,
     themeMode: themeMode,
+    language: language,
     showContactTime: showContactTime,
     showTotalTime: showTotalTime,
+    showFlightDelta: showFlightDelta,
     showJumpDetails: showJumpDetails,
     hiddenDetails: hiddenDetails,
   );
@@ -136,8 +161,10 @@ class SettingsRepository {
   static const _kPairedName = 'paired_device_name';
   static const _kMock = 'use_mock_sensor';
   static const _kTheme = 'theme_mode';
+  static const _kLanguage = 'language';
   static const _kShowContact = 'show_contact_time';
   static const _kShowTotal = 'show_total_time';
+  static const _kShowDelta = 'show_flight_delta';
   static const _kShowDetails = 'show_jump_details';
   static const _kHiddenDetails = 'hidden_jump_details';
 
@@ -162,8 +189,12 @@ class SettingsRepository {
       themeMode:
           AppThemeMode.values.asNameMap()[_prefs.getString(_kTheme)] ??
           d.themeMode,
+      language:
+          AppLanguage.values.asNameMap()[_prefs.getString(_kLanguage)] ??
+          d.language,
       showContactTime: _prefs.getBool(_kShowContact) ?? d.showContactTime,
       showTotalTime: _prefs.getBool(_kShowTotal) ?? d.showTotalTime,
+      showFlightDelta: _prefs.getBool(_kShowDelta) ?? d.showFlightDelta,
       showJumpDetails: _prefs.getBool(_kShowDetails) ?? d.showJumpDetails,
       hiddenDetails: _prefs.getStringList(_kHiddenDetails) ?? d.hiddenDetails,
     );
@@ -177,8 +208,10 @@ class SettingsRepository {
     await _prefs.setInt(_kJumps, s.jumpsPerRoutine);
     await _prefs.setBool(_kMock, s.useMockSensor);
     await _prefs.setString(_kTheme, s.themeMode.name);
+    await _prefs.setString(_kLanguage, s.language.name);
     await _prefs.setBool(_kShowContact, s.showContactTime);
     await _prefs.setBool(_kShowTotal, s.showTotalTime);
+    await _prefs.setBool(_kShowDelta, s.showFlightDelta);
     await _prefs.setBool(_kShowDetails, s.showJumpDetails);
     await _prefs.setStringList(_kHiddenDetails, s.hiddenDetails);
     if (s.pairedDeviceId == null) {

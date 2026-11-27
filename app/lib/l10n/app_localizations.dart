@@ -908,6 +908,36 @@ abstract class AppLocalizations {
   /// **'{label} (s)'**
   String columnSeconds(String label);
 
+  /// No description provided for @showFlightDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'Show change to previous jump'**
+  String get showFlightDelta;
+
+  /// No description provided for @showFlightDeltaHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight time difference in ms (blue = longer, red = shorter)'**
+  String get showFlightDeltaHelp;
+
+  /// No description provided for @deltaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Δ'**
+  String get deltaLabel;
+
+  /// No description provided for @columnMilliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} (ms)'**
+  String columnMilliseconds(String label);
+
+  /// No description provided for @milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} ms'**
+  String milliseconds(String value);
+
   /// No description provided for @exportChooserTitle.
   ///
   /// In en, this message translates to:
@@ -1025,7 +1055,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledHelpIntro.
   ///
   /// In en, this message translates to:
-  /// **'The sensor has an orange and a red light. Both sit right next to each other in the same tiny part, so they are easy to mix up. The orange one shows what the sensor is doing, the red one belongs to charging. The bars below show each signal over about two seconds: the coloured part means the light is on.'**
+  /// **'Orange shows the sensor\'s state, red shows charging. They sit close together and are easy to mix up. Each bar shows about 2 s; coloured = on.'**
   String get ledHelpIntro;
 
   /// No description provided for @ledOrangeSection.
@@ -1049,7 +1079,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledWaitingMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The sensor is awake and waiting for the app. The app connects by itself once the sensor is paired.'**
+  /// **'Awake, waiting for the app.'**
   String get ledWaitingMeaning;
 
   /// No description provided for @ledConnectedTitle.
@@ -1067,7 +1097,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledConnectedMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The app is connected. The sensor does not go to sleep while it is connected.'**
+  /// **'Connected to the app.'**
   String get ledConnectedMeaning;
 
   /// No description provided for @ledGoingToSleepTitle.
@@ -1085,7 +1115,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledGoingToSleepMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The sensor is going to sleep to save battery. This happens after 1 minute without a connected app and without a jump.'**
+  /// **'Going to sleep after 1 min without app or jump.'**
   String get ledGoingToSleepMeaning;
 
   /// No description provided for @ledAsleepTitle.
@@ -1103,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledAsleepMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The sensor is asleep and the app cannot find it. Shake or hit the sensor to wake it up: it reacts within about 4 seconds. If nothing happens, the battery may be empty.'**
+  /// **'Asleep or battery empty. Shake the sensor to wake it (takes up to 4 s).'**
   String get ledAsleepMeaning;
 
   /// No description provided for @ledWokeUpTitle.
@@ -1121,7 +1151,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledWokeUpMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The sensor noticed the movement and woke up. It is now waiting for the app.'**
+  /// **'Woke up from movement.'**
   String get ledWokeUpMeaning;
 
   /// No description provided for @ledErrorTitle.
@@ -1139,7 +1169,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledErrorMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The sensor could not start and does not work. Press the reset button on the sensor or disconnect and reconnect its power.'**
+  /// **'Start-up failed. Press reset or reconnect the power.'**
   String get ledErrorMeaning;
 
   /// No description provided for @ledRedSection.
@@ -1151,7 +1181,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledRedBody.
   ///
   /// In en, this message translates to:
-  /// **'The red light belongs to the charging chip, not to the sensor software. It only works while the sensor is plugged in via USB: on battery power it is always off. It says nothing about the connection to the app.'**
+  /// **'Only works while plugged in via USB.'**
   String get ledRedBody;
 
   /// No description provided for @ledChargingTitle.
@@ -1169,7 +1199,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledChargingMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The battery is charging. The last part of charging is slow: the light can keep flashing for half an hour or more while the app already shows over 90 %.'**
+  /// **'Charging. The last 10 % can take another 30 min or more.'**
   String get ledChargingMeaning;
 
   /// No description provided for @ledChargedTitle.
@@ -1187,7 +1217,7 @@ abstract class AppLocalizations {
   /// No description provided for @ledChargedMeaning.
   ///
   /// In en, this message translates to:
-  /// **'The battery is full. After that the light stays off, even though USB is still connected.'**
+  /// **'Fully charged.'**
   String get ledChargedMeaning;
 
   /// No description provided for @ledChargeOffTitle.
@@ -1205,13 +1235,13 @@ abstract class AppLocalizations {
   /// No description provided for @ledChargeOffMeaning.
   ///
   /// In en, this message translates to:
-  /// **'Usually the battery is full. If the sensor was just plugged in and the red light never came on, check the cable and the power source. The light can start flashing again later when the charger tops the battery up.'**
+  /// **'Usually full. If it never lit up, check the cable and power source.'**
   String get ledChargeOffMeaning;
 
   /// No description provided for @ledRedSource.
   ///
   /// In en, this message translates to:
-  /// **'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.'**
+  /// **'Taken from the charger\'s data sheet; only the charging flash has been confirmed on real sensors.'**
   String get ledRedSource;
 
   /// No description provided for @simRestart.
@@ -1261,6 +1291,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The changelog could not be loaded.'**
   String get changelogLoadFailed;
+
+  /// No description provided for @language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// No description provided for @languageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get languageSystem;
+
+  /// No description provided for @healthSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor health'**
+  String get healthSection;
+
+  /// No description provided for @sampleRateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample rate'**
+  String get sampleRateLabel;
+
+  /// No description provided for @hertz.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} Hz'**
+  String hertz(String value);
+
+  /// No description provided for @pllLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample clock (PLL)'**
+  String get pllLabel;
+
+  /// No description provided for @pllLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get pllLocked;
+
+  /// No description provided for @pllAcquiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Settling…'**
+  String get pllAcquiring;
+
+  /// No description provided for @pllNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get pllNotAvailable;
+
+  /// No description provided for @uptimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Time since start'**
+  String get uptimeLabel;
 }
 
 class _AppLocalizationsDelegate

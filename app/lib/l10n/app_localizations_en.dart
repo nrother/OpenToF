@@ -454,6 +454,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get showFlightDelta => 'Show change to previous jump';
+
+  @override
+  String get showFlightDeltaHelp =>
+      'Flight time difference in ms (blue = longer, red = shorter)';
+
+  @override
+  String get deltaLabel => 'Δ';
+
+  @override
+  String columnMilliseconds(String label) {
+    return '$label (ms)';
+  }
+
+  @override
+  String milliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
   String get exportChooserTitle => 'Export as CSV';
 
   @override
@@ -524,7 +544,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledHelpIntro =>
-      'The sensor has an orange and a red light. Both sit right next to each other in the same tiny part, so they are easy to mix up. The orange one shows what the sensor is doing, the red one belongs to charging. The bars below show each signal over about two seconds: the coloured part means the light is on.';
+      'Orange shows the sensor\'s state, red shows charging. They sit close together and are easy to mix up. Each bar shows about 2 s; coloured = on.';
 
   @override
   String get ledOrangeSection => 'Orange light';
@@ -536,8 +556,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ledWaitingTiming => '0.3 s on, 0.7 s off, repeating';
 
   @override
-  String get ledWaitingMeaning =>
-      'The sensor is awake and waiting for the app. The app connects by itself once the sensor is paired.';
+  String get ledWaitingMeaning => 'Awake, waiting for the app.';
 
   @override
   String get ledConnectedTitle => 'On all the time';
@@ -546,8 +565,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ledConnectedTiming => 'Steady light';
 
   @override
-  String get ledConnectedMeaning =>
-      'The app is connected. The sensor does not go to sleep while it is connected.';
+  String get ledConnectedMeaning => 'Connected to the app.';
 
   @override
   String get ledGoingToSleepTitle => '6 quick blinks, then off';
@@ -557,7 +575,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledGoingToSleepMeaning =>
-      'The sensor is going to sleep to save battery. This happens after 1 minute without a connected app and without a jump.';
+      'Going to sleep after 1 min without app or jump.';
 
   @override
   String get ledAsleepTitle => 'Off';
@@ -567,7 +585,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledAsleepMeaning =>
-      'The sensor is asleep and the app cannot find it. Shake or hit the sensor to wake it up: it reacts within about 4 seconds. If nothing happens, the battery may be empty.';
+      'Asleep or battery empty. Shake the sensor to wake it (takes up to 4 s).';
 
   @override
   String get ledWokeUpTitle => '3 short blinks, then slow blinking';
@@ -576,8 +594,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ledWokeUpTiming => '0.08 s on, 0.08 s off, 3 times';
 
   @override
-  String get ledWokeUpMeaning =>
-      'The sensor noticed the movement and woke up. It is now waiting for the app.';
+  String get ledWokeUpMeaning => 'Woke up from movement.';
 
   @override
   String get ledErrorTitle => 'Fast blinking that does not stop';
@@ -587,14 +604,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledErrorMeaning =>
-      'The sensor could not start and does not work. Press the reset button on the sensor or disconnect and reconnect its power.';
+      'Start-up failed. Press reset or reconnect the power.';
 
   @override
   String get ledRedSection => 'Red light (charging)';
 
   @override
-  String get ledRedBody =>
-      'The red light belongs to the charging chip, not to the sensor software. It only works while the sensor is plugged in via USB: on battery power it is always off. It says nothing about the connection to the app.';
+  String get ledRedBody => 'Only works while plugged in via USB.';
 
   @override
   String get ledChargingTitle => 'Short flash about once a second';
@@ -604,7 +620,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledChargingMeaning =>
-      'The battery is charging. The last part of charging is slow: the light can keep flashing for half an hour or more while the app already shows over 90 %.';
+      'Charging. The last 10 % can take another 30 min or more.';
 
   @override
   String get ledChargedTitle => 'On for just under a minute, then off';
@@ -613,8 +629,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ledChargedTiming => 'Steady light for about 50 s';
 
   @override
-  String get ledChargedMeaning =>
-      'The battery is full. After that the light stays off, even though USB is still connected.';
+  String get ledChargedMeaning => 'Fully charged.';
 
   @override
   String get ledChargeOffTitle => 'Off while plugged in';
@@ -624,11 +639,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledChargeOffMeaning =>
-      'Usually the battery is full. If the sensor was just plugged in and the red light never came on, check the cable and the power source. The light can start flashing again later when the charger tops the battery up.';
+      'Usually full. If it never lit up, check the cable and power source.';
 
   @override
   String get ledRedSource =>
-      'These signals are taken from the data sheet of the charging chip. On our own sensors only the flashing while charging has been seen so far, so the other two may differ slightly. The app cannot show whether the sensor is charging, because the sensor software cannot read this light.';
+      'Taken from the charger\'s data sheet; only the charging flash has been confirmed on real sensors.';
 
   @override
   String get simRestart => 'Simulate sensor restart';
@@ -653,4 +668,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changelogLoadFailed => 'The changelog could not be loaded.';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get languageSystem => 'System';
+
+  @override
+  String get healthSection => 'Sensor health';
+
+  @override
+  String get sampleRateLabel => 'Sample rate';
+
+  @override
+  String hertz(String value) {
+    return '$value Hz';
+  }
+
+  @override
+  String get pllLabel => 'Sample clock (PLL)';
+
+  @override
+  String get pllLocked => 'Locked';
+
+  @override
+  String get pllAcquiring => 'Settling…';
+
+  @override
+  String get pllNotAvailable => 'Not available';
+
+  @override
+  String get uptimeLabel => 'Time since start';
 }
